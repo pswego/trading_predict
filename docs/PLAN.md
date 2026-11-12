@@ -1,0 +1,608 @@
+# 차트 빈칸 퍼즐 게임 — 구현 계획서
+
+> 가칭 **"빈칸 차트 (Chart Gap)"**
+> 실제 주식 차트의 **중간 구간**을 가리고, 사용자가 4개 보기(또는 O/X) 중 실제로 이어진 모양을 맞히는 웹 게임.
+> 이 문서는 구현자가 추가 질문 없이 끝까지 만들 수 있도록 모든 결정·알고리즘·스키마·API·검증 기준을 담는다.
+
+---
+
+## 0. 확정된 결정 (기본값)
+
+| 항목 | 결정 | 이유 |
+|---|---|---|
+| 대상 시장 (MVP) | 한국 KOSPI·KOSDAQ 보통주 (상장폐지 종목 포함) | 데이터 확보 검증 완료 (§1) |
+| 차트 단위 | 일봉 + 주봉 (월봉은 v2) | 월봉은 문제 수가 적음 |
+| 빈칸 위치 | **차트 중간** (전체의 30~70% 지점, 랜덤) | 요구사항 |
+| 게임 방식 | 4지선다 / O/X | 요구사항 |
+| 데이터 획득 | **가격 데이터 수집 → 직접 렌더링** (이미지 크롤링 안 함) | 정확한 마스킹, 오답 생성, 법적 리스크 |
+| 백엔드 | Python 3.12 · FastAPI · SQLAlchemy 2 · SQLite(개발/MVP) → PostgreSQL(운영) | 데이터 처리와 서버를 한 언어로 |
+| 파이프라인 | pandas · numpy · pyarrow(Parquet) · scikit-learn(판별기) | |
+| 프론트 | React 18 · Vite · TypeScript · Tailwind · Zustand · React Router | 정적 SPA를 FastAPI가 서빙 → 배포 단위 1개 |
+| 차트 렌더링 | **자체 SVG 캔들 컴포넌트** (라이브러리 미사용) | 빈칸 마스크, 보기 끼워보기, 썸네일, 공개 애니메이션을 완전히 제어. 날짜 축 강제 없음 |
+| 색상 관례 | 상승 빨강 / 하락 파랑 (한국식), 설정에서 미국식(초록/빨강) 전환 | |
+| 사용자 식별 | 익명 UUID 쿠키(httpOnly) → 서버가 푼 문제 기록. 닉네임은 리더보드 등록 시에만 | 로그인 없이 중복 방지 가능 |
+| 패키지 관리 | Python: `uv` / JS: `npm` | |
+| 배포 | Docker 단일 이미지 (API + 정적 웹) + 영속 볼륨(SQLite·Parquet) | |
+
+---
+
+## 1. 사전 검증된 사실 (2026-11-12 실측)
+
+| 소스 | 결과 | 사용 방식 |
+|---|---|---|
+| **네이버 차트 API** `fchart.stock.naver.com/sise.nhn?symbol={code}&timeframe={day\|week\|month}&count=N&requestType=0` | 인증 불필요. **수정주가**. 일봉은 종목당 **최근 3,000봉 상한**(상장 종목은 2014-08 이후). 주봉 3,000봉 = 사실상 **전체 이력**. **상장폐지 종목도 조회됨**(폐지일 기준 직전 3,000봉) | **주 가격 소스** |
+| FinanceDataReader `StockListing('KRX')` | 현재 상장 종목 2,567개(보통주 근사), 시총·상장주식수 포함 | 종목 마스터 |
+| FinanceDataReader `StockListing('KRX-DELISTING')` | 상장폐지 이력 4,218건. 2002년 이후 폐지 KOSPI/KOSDAQ 보통주 1,099개, 폐지 사유 포함 | 폐지 종목 마스터 + 정답 공개 연출 |
+| pykrx | **KRX 로그인 필요**(`KRX_ID`/`KRX_PW`) → 기본 경로에서 제외. 선택 기능(정확한 과거 시총) | v2 선택 |
+| Yahoo (`YAHOO:005930.KS`) | 2000년부터 일봉 가능. 하지만 비공식이고 429/크럼 오류가 잦음 | v2: 2014년 이전 일봉 보강 |
+| KRX 엔드포인트 | 간헐적으로 실패함(JSON 디코드 오류) | 재시도 + 로컬 캐시 필수 |
+
+**데이터 풀 실측 (일봉, 80봉 윈도우, 겹치지 않게, 품질 필터 통과율 46~54%)**
+- 상장 종목: 대형 약 1,600 / 중형 약 7,900 / 소형 약 26,000 → **약 36,000**
+- 상장폐지 종목 추정: 1,099개 × 평균 약 1,800거래일 → **약 1만 개 추가**
+- 주봉 추정: **약 1.5만 개 이상**
+- **MVP 총 문제 풀: 약 6만 개 규모** (M1에서 정확히 실측해 `docs/data_report.md`에 기록)
+
+---
+
+## 2. 게임 규칙
+
+### 2.1 문제 구조
+
+```
+  왼쪽 맥락 L봉           빈칸 G봉            오른쪽 맥락 R봉
+ ┃┃╻┃┃╻┃╻┃┃┃╻┃  │░░░░░░░ ? ░░░░░░░│  ┃╻┃┃┃╻┃┃╻┃┃
+                ▲ c[L-1]           ▲ c[L+G-1] (모든 보기에서 동일)
+```
+
+- 모든 보기는 **빈칸 직전 종가에서 출발해 빈칸 마지막 종가에서 끝난다** (양 끝 고정). 따라서 오른쪽 맥락의 첫 시가로 넘어가는 갭도 모든 보기에서 같다.
+- Y축은 **빈칸 직전 종가 = 0%** 기준 퍼센트로 표시. 가격·날짜·종목명은 정답 공개 전까지 숨긴다.
+- X축은 표시하지 않음 (또는 빈칸 기준 상대 위치만 표시).
+
+### 2.2 난이도별 레이아웃
+
+| | 쉬움 | 보통 | 어려움 |
+|---|---|---|---|
+| 일봉 L / G / R | 40 / 10 / 40 | 30 / 18 / 30 | 20 / 28 / 20 |
+| 주봉 L / G / R | 30 / 8 / 30 | 24 / 12 / 24 | 16 / 18 / 16 |
+| 거래량 막대 | 표시 | 표시 | 숨김 |
+| 이동평균선(5·20) | 표시 | 숨김 | 숨김 |
+| 오답 생성 전략 | §4.6 E | §4.6 N | §4.6 H |
+| 추측 가능성 점수 P (§4.4) | 0.60 이상 | 0.35~0.60 | 0.35 미만 |
+| 제한시간 (4지 / OX) | 25s / 12s | 20s / 10s | 20s / 10s |
+| 점수 배율 | ×1.0 | ×1.5 | ×2.5 |
+
+### 2.3 모드
+
+| 모드 | 규칙 |
+|---|---|
+| **빠른 10문제** | 필터 선택 → 10문제 → 결과 요약 |
+| **서바이벌** | 목숨 3개, 틀리면 1개 감소, 5연속 정답마다 난이도 한 단계 상승 |
+| **데일리 챌린지** | 날짜 시드로 고정한 5문제(쉬움 2·보통 2·어려움 1), 모든 사용자 동일, 하루 1회, 리더보드 |
+| **무한 연습** | 점수 없음, 필터 고정, 계속 출제 |
+
+게임 방식(4지선다/OX)은 모든 모드에서 선택 가능하다. 데일리만 4지선다로 고정.
+
+### 2.4 O/X 방식
+- 같은 문제 데이터를 쓴다. 빈칸에 **보기 하나**만 끼워서 보여주고, 50% 확률로 실제, 50% 확률로 오답 중 하나를 넣는다.
+- 질문: "이 모양이 실제로 이어진 차트일까?" → O / X
+
+### 2.5 점수
+```
+기본점수   = 100 × 난이도 배율
+시간보너스 = 기본점수 × 0.5 × (남은시간 / 제한시간)
+콤보배율   = min(1 + 0.1 × 연속정답수, 2.0)
+획득점수   = round((기본점수 + 시간보너스) × 콤보배율)    # 오답이면 0, 콤보 초기화
+O/X 방식은 획득점수 × 0.5
+```
+서버 시각(`served_at` → `answered_at`) 기준으로 계산한다. 제한시간을 넘기면 오답 처리.
+
+### 2.6 정답 공개 화면
+- 가림막이 걷히면서 실제 경로가 왼쪽부터 그려지는 애니메이션(0.8초). 선택했던 오답은 반투명으로 겹쳐 보여줌
+- 공개 정보: 종목명·코드·시장·기간(실제 날짜)·당시 시총 구간·빈칸 구간 수익률·빈칸 안 최고/최저
+- 상장폐지 종목이면 **"이 종목은 2018-05-04 상장폐지되었습니다 (감사의견 거절)"** 표시
+- "다른 보기들은 어디서 왔나요?" 접이식: 오답의 출처 유형 표시 (예: "같은 종목 2017년 구간 변형")
+
+---
+
+## 3. 시스템 구조
+
+```
+┌──────────────────────── 배치 파이프라인 (Python CLI: `chartgame`) ────────────────────────┐
+│ ingest-listing → ingest-prices → clean → windows → features → decoys → validate → build  │
+│  (종목마스터)     (네이버, Parquet)  (품질)   (구간추출)  (난이도)   (오답)   (판별기 게이트) (DB 적재) │
+└──────────────────────────────────────────┬──────────────────────────────────────────────┘
+                                           ▼
+            data/raw/*.parquet (가격)     db: questions / plays / sessions / ...
+                                           ▼
+                         FastAPI (`chartgame.api`) — 출제·채점·Elo·리더보드
+                                           ▼
+                         React SPA (`web/`) — FastAPI가 /로 정적 서빙
+```
+
+### 3.1 디렉터리 구조
+
+```
+trading_predict/
+├─ docs/
+│  ├─ PLAN.md                 # 이 문서
+│  └─ data_report.md          # M1 산출물: 실측 데이터 리포트
+├─ backend/
+│  ├─ pyproject.toml          # uv, ruff, pytest, hypothesis
+│  ├─ chartgame/
+│  │  ├─ config.py            # 경로, 레이아웃 상수, 가격제한폭 표, 임계값 (전부 여기)
+│  │  ├─ cli.py               # typer 기반 CLI 진입점
+│  │  ├─ core/
+│  │  │  ├─ types.py          # Candle, Window, Layout, Question (dataclass)
+│  │  │  ├─ limits.py         # 시장·날짜별 가격제한폭
+│  │  │  └─ normalize.py      # 가격 → 상대비율, 거래량 정규화
+│  │  ├─ sources/
+│  │  │  ├─ base.py           # PriceSource 프로토콜
+│  │  │  ├─ naver.py          # fchart XML 파서 + 재시도/레이트리밋
+│  │  │  └─ listing.py        # FDR 종목/폐지 마스터 + 캐시
+│  │  ├─ pipeline/
+│  │  │  ├─ ingest.py
+│  │  │  ├─ clean.py
+│  │  │  ├─ marcap.py         # 시점별 시총 근사 + 구간 랭크
+│  │  │  ├─ windows.py
+│  │  │  ├─ features.py
+│  │  │  ├─ difficulty.py
+│  │  │  ├─ decoys.py
+│  │  │  ├─ discriminator.py
+│  │  │  ├─ validate.py
+│  │  │  ├─ build.py
+│  │  │  └─ preview.py        # 샘플 문제 컨택트 시트 PNG (matplotlib)
+│  │  ├─ db/
+│  │  │  ├─ models.py
+│  │  │  └─ session.py
+│  │  └─ api/
+│  │     ├─ main.py           # 앱, 정적 서빙, 미들웨어(익명 쿠키)
+│  │     ├─ schemas.py        # pydantic
+│  │     ├─ routes_meta.py  routes_game.py  routes_daily.py  routes_me.py
+│  │     └─ services/
+│  │        ├─ selector.py    # 출제 + 중복 방지
+│  │        ├─ scoring.py
+│  │        ├─ elo.py
+│  │        └─ tokens.py      # 서명된 play token (itsdangerous)
+│  └─ tests/
+│     ├─ fixtures/            # 네이버 XML 샘플, 소형 Parquet
+│     └─ test_*.py
+├─ web/
+│  ├─ package.json  vite.config.ts  tailwind.config.ts
+│  └─ src/
+│     ├─ api/client.ts
+│     ├─ chart/
+│     │  ├─ CandleChart.tsx   # 메인/썸네일/공개 공용
+│     │  ├─ scale.ts          # 좌표 변환 (단위 테스트)
+│     │  └─ theme.ts
+│     ├─ pages/  Home.tsx Setup.tsx Play.tsx Result.tsx Daily.tsx Leaderboard.tsx Stats.tsx
+│     ├─ components/  OptionCard.tsx OXButtons.tsx Timer.tsx ScoreBar.tsx RevealPanel.tsx ShareCard.tsx
+│     └─ store/game.ts
+├─ e2e/                       # Playwright
+├─ data/                      # .gitignore (raw parquet, sqlite)
+├─ Dockerfile  docker-compose.yml  Makefile
+└─ .github/workflows/ci.yml
+```
+
+---
+
+## 4. 데이터 파이프라인 상세
+
+### 4.1 종목 마스터 (`ingest-listing`)
+- 상장: `fdr.StockListing('KRX')` → `Market ∈ {KOSPI, KOSDAQ, KOSDAQ GLOBAL}`, 코드 끝자리 `0`(보통주), 이름에 `스팩|리츠|ETN|ETF|선박|인프라` 포함 시 제외
+- 폐지: `fdr.StockListing('KRX-DELISTING')` → `SecuGroup=='주권' & Kind=='보통주' & Market∈{KOSPI,KOSDAQ} & DelistingDate>=2002-01-01`, 사유에 `스팩` 포함 시 제외
+- 저장: `data/raw/stocks.parquet` (code, name, market, sector, listed_date, delisted_date, delist_reason, shares, is_delisted)
+- KRX 호출은 3회 재시도(지수 백오프), 성공하면 캐시하고 실패하면 기존 캐시 사용
+
+### 4.2 가격 수집 (`ingest-prices`)
+- 종목 × {day, week} 마다 `count=3000` 1회 호출. XML `item data="YYYYMMDD|O|H|L|C|V"` 파싱
+- 레이트리밋: 동시 2개, 요청 간 0.4초 이상, 429/5xx면 백오프. **중단 후 재개 가능** (완료 목록 체크포인트)
+- 증분 모드(`--incremental`): `count=20`으로 받아서 날짜 기준 upsert
+- 저장: `data/raw/prices/{interval}/{code}.parquet` (date, open, high, low, close, volume)
+- 예상 호출 수: (2,567 + 1,099) × 2 ≈ 7,300회 → 약 1시간
+
+### 4.3 정제 (`clean`)
+행 단위:
+- O/H/L/C 중 하나라도 0 또는 NaN인 행은 "거래 없음"으로 표시 (네이버는 거래 없는 날을 `0|0|0|C|0` 형태로 줌)
+- `H < max(O,C)` 또는 `L > min(O,C)`이면 보정하지 않고 오류로 표시
+
+윈도우 단위(§4.5에서 적용)로 거를 조건:
+- 거래 없음 또는 거래량 0인 봉 > 2%
+- 종가 변동 없는 봉 > 5%
+- 연속 거래일 사이 달력 간격 > 7일(일봉) / > 21일(주봉) → 거래정지 구간
+- 일간 |수익률| > 가격제한폭 + 1%p → 데이터 오류 또는 미반영 분할
+- 상장 후 첫 5거래일 / 폐지 전 마지막 10거래일(정리매매, 제한폭 없음) 포함
+- 종가 < 50원
+- 중앙 거래대금(종가×거래량) < 5천만 원 (일봉 기준)
+
+**가격제한폭 표 (`core/limits.py`)**
+
+| 시장 | 기간 | 제한폭 |
+|---|---|---|
+| KOSPI | 1998-12-07 ~ 2015-06-14 | ±15% |
+| KOSDAQ | ~ 2005-03-27 | ±12% |
+| KOSDAQ | 2005-03-28 ~ 2015-06-14 | ±15% |
+| 모두 | 2015-06-15 ~ | ±30% |
+
+M1에서 실제 데이터의 시기별 최대 일간 수익률 분포로 교차검증하고, 결과를 `data_report.md`에 기록한다. 주봉은 제한폭 검사를 하지 않는다 (주간 누적이라 해당 없음).
+
+### 4.4 시점별 시총 구간 (`marcap`)
+- 근사식: `시총(t) ≈ 수정종가(t) × 현재(또는 폐지 시점) 상장주식수`. 수정주가라서 분할은 반영되고, 유상증자 등 주식 수 변화만 오차로 남는다
+- 매월 첫 거래일 스냅샷을 만들고, 시장별로 **당시 순위**를 매김
+- 구간: **대형** = 시장 통합 상위 100위 / **중형** = 101~500위 / **소형** = 501~1,500위 / **초소형** = 1,501위 이하
+- 윈도우의 시총 구간 = 윈도우 시작일이 속한 월의 스냅샷 순위
+- v2: KRX 계정이 있으면 pykrx 실제 시총으로 교체 (인터페이스는 동일하게 유지)
+
+### 4.5 구간 추출 (`windows`)
+- 종목·주기별로 **영역(region)** 을 겹치지 않게 자름: 영역 길이 = 그 주기의 최대 레이아웃 길이(일봉 90, 주봉 68), stride = 영역 길이
+- 영역마다 후보 9개 생성: 레이아웃 3종(쉬움/보통/어려움) × 빈칸 시작 오프셋 3개 (빈칸 중심이 영역의 30~70% 지점에 오도록 시드 기반 랜덤). 레이아웃이 영역보다 짧으면 영역 안에서 위치도 랜덤
+- 영역 하나에서는 **문제 1개만** 채택 → 사용자 입장의 고유 문제 수 = 영역 수
+- 각 후보마다 §4.6 특징량과 P를 계산하고, 그 후보의 레이아웃 난이도 범위에 P가 들어가는 후보만 남김. 여럿이면 쿼터가 부족한 난이도 우선 (목표 비율 쉬움 40 : 보통 35 : 어려움 25)
+- 시드: `hash(code, interval, region_index)` → 다시 빌드해도 결과가 같음
+
+### 4.6 특징량과 추측 가능성 점수 P (`features`, `difficulty`)
+표기: 로그 종가 `x_t`, 빈칸 `[L, L+G)`, 맥락 로그수익률 표준편차 `σ_c`, 빈칸 로그수익률 표준편차 `σ_g`.
+브리지 기준선 `b_t` = `x_{L-1}`과 `x_{L+G-1}` 사이 선형 보간.
+
+| 특징 | 정의 | P에 미치는 영향 |
+|---|---|---|
+| S 놀람도 | `max_t |x_t − b_t| / (σ_c·√G)` | 클수록 추측이 어려움 (−) |
+| T 추세 연속성 | `1 − clip(|slope_gap − mean(slope_L, slope_R)| / σ_c, 0, 1)` (slope는 OLS 기울기) | 클수록 쉬움 (+) |
+| E 효율비 | `|x_{L+G-1} − x_{L-1}| / Σ|Δx|` (빈칸 구간) | 클수록 깔끔한 추세라 쉬움 (+) |
+| V 변동성 이질성 | `|ln(σ_g / σ_c)|` | 클수록 어려움 (−) |
+| K 경계 단서 | 경계 ±2봉의 max(|갭수익률|/σ_c, 거래량 z-score)를 0~1로 클립 | 클수록 쉬움 (+) |
+| B 캔들 가독성 | 빈칸 평균 `|C−O| / (H−L)` (몸통 비율) | 클수록 쉬움 (+) |
+
+```
+z = 1.2·T + 1.0·E + 0.8·K + 0.5·B − 1.0·S − 0.8·V + 0.2
+P = sigmoid(z)
+```
+- 가중치 초기값은 위와 같이 고정. M3에서 판별기 결과와 플레이테스트로 1회 재조정한다
+- 운영 중에는 **Elo 문제 레이팅**(§6.3)이 P를 대체해 난이도를 결정한다. P는 초기값 역할
+
+### 4.7 오답 생성 (`decoys`) — 핵심 알고리즘
+
+**공통 표현.** 봉 t를 직전 종가 기준 상대값으로 표현한다:
+`r_t = ln(C_t/C_{t−1})`, `o_t = ln(O_t/C_{t−1})`, `h_t = ln(H_t/C_{t−1})`, `l_t = ln(L_t/C_{t−1})`, 거래량 `v_t`.
+
+**목표값 (실제 빈칸에서 계산).** 누적수익률 `R* = x_{L+G−1} − x_{L−1}`, 빈칸 변동성 `σ_g`, 맥락 거래량 중앙값 `m_v`.
+
+**변환 절차 (출처 구간 D를 오답으로 만들기)**
+1. 스케일: `k = σ_g / σ_D` (난이도 E는 일부러 `k`를 0.5배 또는 1.8배로 어긋나게 할 수 있음)
+2. 모든 r, o, h, l에 `k`를 곱함
+3. 드리프트 보정: `d = (R* − Σ k·r_t) / G`, 각 `r_t`에 `d`를 더함. **|d| > 0.25·σ_g인 후보는 버림** (변형이 너무 커서 부자연스러움). 그래서 후보를 고를 때부터 `|Σ k·r − R*|`이 작은 순으로 고름
+4. 복원: `C_t = C_{t−1}·e^{r_t}`, `O_t = C_{t−1}·e^{o_t}`, `H_t = C_{t−1}·e^{h_t}`, `L_t = C_{t−1}·e^{l_t}`, 그다음 `H = max(H,O,C)`, `L = min(L,O,C)`로 강제
+5. 마지막 종가를 실제 `C_{L+G−1}`에 정확히 맞춤 (부동소수 오차는 마지막 봉에서 흡수)
+6. 가격 격자: 맥락 구간에서 관측된 **가격 최소 단위**(서로 다른 가격들 차이의 최솟값, 수정주가라 실제 호가단위와 다를 수 있음)로 반올림. 저가주에서 계단 모양이 티 나는 것을 막기 위함
+7. 거래량: `v'_t = v_t × m_v / median(v_D)`
+8. 유효성 검사(§4.8)를 통과 못 하면 다음 후보로
+
+**거울 반전 (쉬움 전용).** 브리지 기준선을 대칭축으로 뒤집음: 각 가격 p에 대해 `p' = exp(2·b_t − ln p)`, 그리고 H↔L 교환. 양 끝점이 자동으로 보존된다.
+
+**난이도별 전략**
+
+| 코드 | 오답 3개 구성 | 출처 후보 조건 |
+|---|---|---|
+| E (쉬움) | 거울 반전 1 + 변동성 어긋난 타종목 1 + 무작위 타종목 1 | 같은 주기 아무 종목 |
+| N (보통) | 타종목 3 | 같은 시장·같은 시총 구간, `σ` 일치(k ∈ [0.8, 1.25]), 서로 다른 종목 |
+| H (어려움) | 같은 종목 다른 시기 2 + 같은 업종 타종목 1 | 같은 종목 또는 업종, `σ` 일치(k ∈ [0.85, 1.18]), 정답과의 DTW 거리가 후보 분포 하위 30~60% (너무 똑같지도, 너무 다르지도 않게) |
+
+**다양성 조건.** 보기 4개끼리 정규화한 경로의 DTW 거리가 `0.15·σ_g·G`보다 작으면 거의 같은 모양으로 보고 교체한다.
+
+**출처 인덱스.** 빠른 후보 검색을 위해 모든 길이 G 구간의 `(code, start, σ, R, sector, cap_tier)`를 미리 계산한 테이블 `segments_{interval}_{G}.parquet`을 만들어 둔다.
+
+### 4.8 오답 유효성 검사 (`validate`) — 모두 자동 테스트
+- 첫 봉의 기준 종가 = 실제 `C_{L−1}`, 마지막 종가 = 실제 `C_{L+G−1}` (상대오차 < 1e-9)
+- 모든 봉에서 `L ≤ min(O,C) ≤ max(O,C) ≤ H`, 모든 값 > 0
+- 일봉: 모든 봉의 |C/C_prev − 1|, H/C_prev − 1, 1 − L/C_prev가 해당 시기 가격제한폭 이하
+- 가격이 가격 격자 위에 있음
+- 다양성 조건 충족
+
+### 4.9 판별기 품질 게이트 (`discriminator`) — 오답이 티 나는지 기계로 검사
+- 목적: "사람보다 집요한 판별자"가 실제와 오답을 구별할 수 있으면 오답 생성기에 티가 남아 있다는 뜻
+- 입력 특징 (빈칸 경로 + 경계 이음새): 변동성비, 경계 갭 수익률, 꼬리/몸통 비율 분포, 수익률 자기상관(lag1~3), 거래량-|수익률| 상관, 가격 격자 위반 수, 최대 이탈, 첨도, 연속 양봉/음봉 길이 분포
+- 모델: `HistGradientBoostingClassifier`, 종목 단위로 학습/검증 분리
+- 평가: 4지선다 문제에서 판별기가 확률이 가장 높은 보기를 고를 때의 정답률
+
+| 난이도 | 통과 기준 (우연 확률 25%) |
+|---|---|
+| 쉬움 | 기준 없음 (쉬워도 됨) |
+| 보통 | ≤ 45% |
+| 어려움 | ≤ 35% |
+
+- 기준을 넘으면 특징 중요도 상위 항목을 보고 생성기를 수정한다 (예: 거래량 패턴이 티 나면 §4.7-7 개선)
+- 문제 단위: 어려움 문제에서 판별기가 실제 보기를 큰 차이로 1순위로 꼽으면 오답을 재생성하고, 3회 실패하면 보통으로 강등
+- 판별기 정답 확률은 문제의 `ai_p_real`로 저장해서 난이도 초기값에 반영
+
+### 4.10 시각 QA (`preview`)
+- `chartgame preview --difficulty hard --n 24` → 문제 24개를 4지선다 레이아웃 그대로 그린 PNG 컨택트 시트 생성 (정답 위치 표시 버전과 숨김 버전)
+- 구현자(Claude)가 이 이미지를 직접 보고 "티 나는 오답"을 찾는 사람 검수 단계로 사용
+
+### 4.11 적재 (`build`)
+- 통과한 문제를 DB `questions`에 upsert. 페이로드는 정규화한 값 (§5.2)
+- 메타 요약 테이블 `pool_stats`(필터 조합별 문제 수) 갱신
+
+### 4.12 일일 자동화
+- 매 거래일 18:30 KST: `chartgame daily` = 증분 수집 → 새 데이터로 생긴 영역만 추출 → 문제 생성 → 적재
+- 주 1회 일요일: 종목 마스터 갱신 (신규 상장/폐지 반영)
+- 실행 위치: 컨테이너 안 APScheduler (환경변수 `ENABLE_SCHEDULER=1`일 때) 또는 외부 cron에서 `docker exec`
+- 실패 시 다음 실행에서 재시도. 결과는 `data/logs/`에 기록
+
+---
+
+## 5. 데이터베이스
+
+### 5.1 테이블
+
+```sql
+stocks(code PK, name, market, sector, listed_date, delisted_date, delist_reason, is_delisted)
+
+questions(
+  id            INTEGER PK,
+  public_id     TEXT UNIQUE,         -- 노출용 랜덤 ID (순번 추측 방지)
+  code          TEXT FK,
+  interval      TEXT,                -- 'day' | 'week'
+  start_date    DATE, end_date DATE, -- 전체 윈도우 (L+G+R)
+  gap_start     DATE, gap_end DATE,
+  market        TEXT, cap_tier TEXT, sector TEXT, era TEXT,  -- '2000s' | '2010s' | '2020s'
+  difficulty    TEXT,                -- 'easy' | 'normal' | 'hard'
+  p_score       REAL, ai_p_real REAL,
+  elo           REAL DEFAULT 1000, plays INT DEFAULT 0, correct INT DEFAULT 0,
+  payload       JSON,                -- §5.2
+  reveal        JSON,                -- 종목명, 실제 날짜, 실제 가격 수익률, 폐지 정보, 오답 출처
+  rnd           REAL,                -- 무작위 샘플링용 (0~1), 인덱스
+  created_at    TIMESTAMP
+)
+INDEX (interval, market, cap_tier, era, difficulty, rnd)
+INDEX (code, start_date)
+
+users(id UUID PK, nickname NULL, elo REAL DEFAULT 1000, created_at)
+
+sessions(id UUID PK, user_id FK, mode, game_type, filters JSON, difficulty_policy,
+         index INT, lives INT, streak INT, score INT, finished BOOL, daily_date DATE NULL, created_at)
+
+plays(id PK, session_id FK, user_id FK, question_id FK,
+      code, start_date, end_date,          -- 중복 검사용 비정규화
+      shown_option_order JSON, ox_shown_idx INT NULL,
+      served_at, answered_at NULL, choice INT NULL, correct BOOL NULL, score INT NULL)
+INDEX (user_id, code)
+
+daily_sets(date PK, question_ids JSON)
+daily_results(date, user_id, score, correct_count, duration_ms, PK(date, user_id))
+
+pool_stats(interval, market, cap_tier, era, difficulty, count, PK(...))
+```
+
+### 5.2 문제 페이로드 (정규화된 값만)
+```json
+{
+  "layout": {"L": 30, "G": 18, "R": 30},
+  "candles": [[o,h,l,c], ...],          // L + R개만. 값 = 가격 / C[L-1], 소수 5자리
+  "volume": [v, ...] | null,            // 맥락 중앙값 = 1, 어려움은 null
+  "options": [ [[o,h,l,c] x G], x4 ],   // [0]이 실제. 서버만 앎. 클라이언트에는 섞어서 보냄
+  "option_volume": [[...] x4] | null,
+  "ma": {"5": [...], "20": [...]} | null
+}
+```
+
+---
+
+## 6. 출제 로직 (`selector`)
+
+### 6.1 후보 선택
+1. 필터(interval, market, cap_tier, era, difficulty)에 맞는 문제 중 `rnd >= r` (r은 무작위) 순으로 200개 조회. 부족하면 앞쪽(`rnd < r`)에서 이어서 조회
+2. 제외 조건:
+   - 이 사용자가 푼 문제와 **같은 종목이면서 날짜 범위가 20% 이상 겹치는** 문제 (`plays`에서 해당 종목들의 범위만 조회)
+   - 최근 20문제 안에 나온 종목 (쿨다운)
+   - 같은 세션에서 이미 나온 문제
+3. 적응형(서바이벌, 또는 난이도 "자동"): 남은 후보 중 `|문제 elo − 사용자 elo|`가 가장 작은 10개에서 무작위 1개
+4. 고정 난이도: 남은 후보에서 무작위 1개
+
+### 6.2 풀 고갈 처리
+- `GET /api/pool/count`가 "이 사용자 기준 남은 문제 수"를 반환 (`pool_stats` − 푼 문제 수 근사, 100개 미만이면 정확히 계산)
+- 설정 화면에 실시간 표시. **50개 미만**이면 경고하고 "인접 조건 포함"(옆 시총 구간, 옆 연대) 토글 제안
+- 0개가 되면 세션을 종료하지 않고, 자동으로 인접 조건으로 넓힌 뒤 안내 토스트 표시
+
+### 6.3 Elo (추측 보정 포함, IRT 3PL 형태)
+```
+기대정답률 p = c + (1 − c) · 1 / (1 + 10^((R_q − R_u) / 400))
+    c = 0.25 (4지선다), 0.5 (O/X)
+결과 s ∈ {0, 1}
+R_u ← R_u + K_u · (s − p)       K_u = 32 (첫 30문제는 48)
+R_q ← R_q − K_q · (s − p)       K_q = max(8, 32 / sqrt(1 + plays/10))
+```
+- 문제 elo 초기값: `1000 + 600 · (0.5 − P)` + `200 · (ai_p_real 보정)`
+- 문제가 30회 이상 플레이되면 난이도 표시를 elo 기준으로 재분류 (쉬움 < 900 ≤ 보통 < 1150 ≤ 어려움). `chartgame recalibrate` 배치
+
+### 6.4 커닝 방지
+- 정답 인덱스·종목·날짜는 응답 전까지 절대 클라이언트로 보내지 않음
+- 보기 순서는 매번 서버에서 섞고 `plays.shown_option_order`에 기록
+- 클라이언트는 `play_token`(서명값, play_id 포함, 10분 만료)만 받음. 문제 ID는 노출하지 않음
+- 답안 제출은 play당 1회. 중복 제출은 409
+- 레이트리밋: 사용자당 분당 60 요청
+
+---
+
+## 7. API 명세 (`/api`)
+
+| 메서드 | 경로 | 요청 | 응답 |
+|---|---|---|---|
+| GET | `/meta/filters` | — | 선택 가능한 시장·시총구간·연대·주기·난이도 + 각 문제 수 |
+| GET | `/pool/count` | 필터 쿼리 | `{total, remaining}` |
+| POST | `/sessions` | `{mode, game_type, filters, difficulty: easy\|normal\|hard\|auto}` | `{session_id, total_questions\|null, lives\|null}` |
+| GET | `/sessions/{id}/next` | — | 문제 (아래) 또는 `{finished: true}` |
+| POST | `/answer` | `{play_token, choice}` (4지선다: 0~3, O/X: `"O"`\|`"X"`) | 채점 결과 (아래) |
+| GET | `/sessions/{id}/summary` | — | 점수, 정답 수, 문제별 결과, 공유 텍스트 |
+| GET | `/daily` | — | 오늘 플레이 여부, 세션 생성 |
+| GET | `/daily/leaderboard?date=` | — | 상위 100 + 내 순위 |
+| POST | `/me/nickname` | `{nickname}` | 2~12자, 금칙어 필터 |
+| GET | `/me/stats` | — | 총 플레이, 정답률(난이도·시장·시총구간별), elo, 최고 연속정답 |
+| GET | `/health` | — | `{ok, questions: n, last_build}` |
+
+**문제 응답**
+```json
+{
+  "play_token": "eyJ...",
+  "index": 3, "total": 10,
+  "game_type": "choice4",
+  "difficulty": "normal",
+  "time_limit_ms": 20000,
+  "layout": {"L": 30, "G": 18, "R": 30},
+  "candles": [[1.012, 1.03, 0.99, 1.0], ...],
+  "volume": [...],
+  "ma": null,
+  "options": [[[...]...], x4],      // game_type = "ox"면 "candidate": [[...]] 하나
+  "option_volume": [...],
+  "context_hint": {"market": "KOSDAQ", "cap_tier": "small", "interval": "day"}
+}
+```
+
+**채점 응답**
+```json
+{
+  "correct": false, "correct_choice": 2,
+  "score_delta": 0, "score_total": 870, "streak": 0, "lives": 2,
+  "elo": {"before": 1012, "after": 998},
+  "reveal": {
+    "name": "씨그널엔터테인먼트그룹", "code": "099830", "market": "KOSDAQ",
+    "start_date": "2016-03-02", "gap_start": "2016-04-14", "gap_end": "2016-05-10", "end_date": "2016-06-21",
+    "cap_tier_then": "small", "gap_return_pct": 18.4, "gap_max_pct": 27.1, "gap_min_pct": -3.2,
+    "delisted": {"date": "2018-05-04", "reason": "감사의견거절"},
+    "decoy_sources": ["same_stock_other_period", "same_sector", "same_stock_other_period"]
+  }
+}
+```
+
+---
+
+## 8. 프론트엔드 상세
+
+### 8.1 화면 흐름
+`Home` → (모드 선택) → `Setup` (필터 + 남은 문제 수) → `Play` ↔ `Reveal`(Play 안의 패널) → `Result` → 공유 / 다시하기
+`Daily`, `Leaderboard`, `Stats`는 Home에서 진입
+
+### 8.2 `CandleChart` 컴포넌트
+```ts
+props: {
+  candles: OHLC[]; layout: {L,G,R};
+  gapFill?: OHLC[] | null;          // 빈칸에 끼워 보여줄 보기
+  gapFillStyle?: 'preview' | 'real' | 'ghost';
+  volume?: number[] | null; ma?: Record<string, number[]> | null;
+  mode: 'main' | 'thumb';           // thumb: 빈칸 양옆 5봉만 흐리게 + 보기만 표시
+  revealAnimate?: boolean;          // 왼쪽→오른쪽 순차 그리기 0.8s
+  colors: Theme;
+}
+```
+- Y 범위 = 맥락과 **모든 보기**를 합친 최소~최대 (보기마다 스케일이 달라서 생기는 단서 방지), 위아래 여백 5%
+- 4개 썸네일 모두 같은 Y 범위 사용
+- 빈칸은 빗금 패턴 + "?" 표시. 가로폭은 G봉 그대로 (빈칸 길이도 정보로 줌)
+- Y축 라벨: 0% 기준 ±% 눈금 4~6개. 0% 수평 점선
+- 반응형: 메인 차트는 컨테이너 폭을 꽉 채우고 높이는 폭의 0.55배(모바일)/0.4배(데스크톱). 봉 폭 = 칸 폭의 70%
+- 순수 함수 `scale.ts` (x/y 변환, 범위 계산)는 vitest로 테스트
+
+### 8.3 Play 화면 상호작용
+- 4지선다: 보기 카드 2×2 (모바일) / 1×4 (데스크톱). **보기를 탭하면 메인 차트 빈칸에 끼워서 미리보기**, "확정" 버튼으로 제출. 키보드 1~4로 선택, Enter로 확정
+- O/X: 메인 차트 빈칸에 후보가 이미 끼워진 상태 + 큰 O/X 버튼. 키보드 O/X
+- 상단: 진행(3/10), 타이머 바, 점수, 콤보 🔥, 목숨 ♥
+- 시간 초과 시 자동으로 오답 처리하고 공개
+- 공개 패널: 정답/오답 연출(진동 피드백 선택), 실제 경로 애니메이션, 공개 정보, "다음" 버튼
+
+### 8.4 공유
+- 결과 텍스트: `빈칸 차트 데일리 2026-11-12 🟩🟥🟩🟩🟩 4/5 · 1,240점` + 링크
+- Web Share API, 미지원이면 클립보드 복사
+
+### 8.5 디자인
+- 기본 다크 테마 (트레이딩 화면 느낌), 라이트 테마 지원 (`prefers-color-scheme` + 수동 전환)
+- 모바일 우선, 최소 폭 360px에서 가로 스크롤 없음
+- 폰트: Pretendard (자체 호스팅)
+- 효과음: 정답/오답/콤보 (기본 꺼짐)
+
+### 8.6 고지
+- 하단 고정: "본 게임은 과거 데이터 기반 오락용이며 투자 권유가 아닙니다. 가격 데이터 출처: 네이버 금융"
+
+---
+
+## 9. 테스트 전략
+
+| 범위 | 도구 | 핵심 케이스 |
+|---|---|---|
+| 소스 파서 | pytest + 고정 XML | 정상, 거래없음 행(`0\|0\|0\|C\|0`), 빈 응답, 인코딩 |
+| 정제·윈도우 | pytest | 거래정지 간격, 제한폭 초과, 폐지 전 10일 제외, 영역 비중복 |
+| 특징·P | pytest | 직선 추세 → P 높음, 빈칸 안 급등 후 원위치 → P 낮음 (합성 데이터) |
+| 오답 불변식 | **hypothesis** 속성 테스트 | 무작위 입력 1,000건에서 §4.8 전 항목 성립 |
+| 판별기 게이트 | pytest (느림 표시) | 소형 고정 데이터셋에서 기준 통과 |
+| 출제/중복 | pytest | 겹침 20% 경계값, 쿨다운, 풀 고갈 시 확장 |
+| Elo/점수 | pytest | 수식 값 검증, 시간 초과 |
+| API | pytest + httpx | 정답 정보 비노출(응답 JSON에 정답 키 없음), 중복 제출 409, 토큰 만료, 세션 흐름 |
+| 차트 스케일 | vitest | 범위, 좌표 변환 |
+| E2E | Playwright | 빠른 10문제 완주 (모바일 390px / 데스크톱 1280px), O/X 완주, 데일리 1회 제한, 스크린샷 |
+| 파이프라인 E2E | pytest | 고정 종목 20개로 수집(모킹)→적재까지 → 문제 생성 확인 |
+
+CI (`.github/workflows/ci.yml`): ruff + pytest(느린 테스트 제외) + 웹 lint/vitest/build + Playwright (고정 DB로 서버 실행).
+
+---
+
+## 10. 마일스톤 (순서대로 구현, 각 단계 완료 조건 포함)
+
+### M0 — 뼈대
+- 디렉터리 구조, `pyproject.toml`, `package.json`, Makefile(`make dev`, `make test`, `make pipeline`, `make preview`), CI, `.gitignore`(data/)
+- **완료 조건**: `make test`가 빈 테스트로 통과, CI 녹색
+
+### M1 — 데이터 수집과 실측
+- `sources/naver.py`, `sources/listing.py`, `pipeline/ingest.py`, `pipeline/clean.py`, `core/limits.py`
+- 전체 종목 일봉·주봉 수집 (재개 가능)
+- `docs/data_report.md`: 종목 수, 행 수, 시기별 최대 수익률(제한폭 검증), 필터 통과율, **필터 조합별 예상 문제 수 표**
+- **완료 조건**: 수집 실패율 < 1%, 리포트 작성, 파서/정제 테스트 통과
+
+### M2 — 구간 추출과 난이도
+- `marcap.py`, `windows.py`, `features.py`, `difficulty.py`
+- **완료 조건**: 영역 비중복 테스트 통과, 난이도 비율이 목표 ±10% 이내, 쉬움/어려움 샘플을 사람이 봤을 때 체감 차이가 확실함 (preview로 확인)
+
+### M3 — 오답 생성과 품질 게이트
+- `decoys.py`, `validate.py`, `discriminator.py`, `preview.py`, 세그먼트 인덱스
+- **완료 조건**: 속성 테스트 통과, 판별기 기준 충족 (보통 ≤ 45%, 어려움 ≤ 35%), 컨택트 시트 24장 육안 검수에서 "한눈에 티 나는 오답" 0개 (쉬움 제외)
+
+### M4 — DB와 빌드
+- `db/models.py`, `pipeline/build.py`, `pool_stats`, `chartgame build --limit` (개발용 소량 빌드)
+- **완료 조건**: 전체 빌드 성공, 필터 조합별 문제 수가 리포트 예상치와 ±15% 이내
+
+### M5 — API
+- 출제·중복 방지·채점·Elo·토큰·세션·데일리·리더보드·통계
+- **완료 조건**: API 테스트 전부 통과, 정답 비노출 테스트 통과, p95 응답 < 150ms (로컬 SQLite, 문제 6만 개)
+
+### M6 — 프론트 핵심 플레이
+- `CandleChart`, Setup, Play(4지선다 + O/X), Reveal, Result
+- **완료 조건**: Playwright로 4지선다/O/X 10문제 완주, 모바일·데스크톱 스크린샷 검수 (레이아웃 깨짐 없음, 가로 스크롤 없음)
+
+### M7 — 모드와 부가 기능
+- 서바이벌, 데일리 + 리더보드, 무한 연습, 공유, 통계, 설정(색상 관례·테마·효과음)
+- **완료 조건**: 모드별 E2E 통과
+
+### M8 — 마감
+- Dockerfile(멀티스테이지: 웹 빌드 → Python 런타임), docker-compose, 스케줄러, README(실행법), 성능 점검, 접근성 점검(대비, 키보드 조작)
+- **완료 조건**: `docker compose up`만으로 게임이 뜨고 일일 배치가 동작
+
+### v2 (MVP 이후)
+- Yahoo로 2014년 이전 일봉 보강, KRX 계정으로 정확한 과거 시총, 미국 주식(Stooq/Yahoo), 월봉, 로그인(OAuth), 친구 대결, 테마 세트("닷컴버블", "코로나장")
+
+---
+
+## 11. 리스크와 대응
+
+| 리스크 | 대응 |
+|---|---|
+| 네이버 비공식 엔드포인트 변경·차단 | `PriceSource` 인터페이스로 소스 교체 가능하게. 수집한 원본 Parquet은 영구 보관. 레이트리밋 준수 |
+| 데이터 이용 약관 (상업화 시) | MVP는 비상업 전제. 수익화하면 정식 데이터 라이선스(KRX 정보데이터시스템 등)로 교체 |
+| 오답이 티 남 | 판별기 게이트 + 컨택트 시트 육안 검수 + 운영 중 문제별 정답률이 비정상적으로 높으면 자동 플래그 |
+| 시총 근사 오차 | 순위 기반 구간이라 영향 제한적. v2에서 KRX 실데이터로 교체 |
+| 풀 고갈 | §6.2 (남은 수 표시, 인접 조건 확장) + 주봉/폐지 종목/v2 소스로 확장 |
+| 같은 차트 재인식 | 영역 비중복 + 20% 겹침 제외 + 종목 쿨다운 |
+| 투자 조언 오해 | 고지문 상시 노출 |
+| 디스크 용량 | 원본 Parquet 약 300MB, 문제 DB 약 200MB 예상. 개발 중엔 `--limit` 소량 빌드 |
+
+---
+
+## 12. 사용자에게 필요한 것
+
+- **MVP에는 없음** (인증 불필요한 소스로 전부 구현 가능)
+- 선택: KRX 정보데이터시스템 계정 (정확한 과거 시총, v2) / 배포처 선택 (M8 시점) / 상업화 여부 (데이터 라이선스 판단)
