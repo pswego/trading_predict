@@ -92,10 +92,14 @@ svg{display:block;width:100%;height:auto}
 /* 결과 */
 .nextbar{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 30%)}
 .nextbar>div{max-width:688px;margin:0 auto}
-.explain{margin-top:12px;padding:16px}.explain ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.explain li{display:flex;gap:8px;align-items:flex-start;font-size:14px;line-height:1.55}
-.tg{flex:none;font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;margin-top:2px}
-.ex-h{font-size:13px;font-weight:800;color:var(--muted);margin:14px 0 8px}
+.explain{margin-top:12px;padding:16px}
+.ex-item{border-top:1px solid var(--line);padding:14px 0 12px}.ex-item:first-of-type{border-top:0;padding-top:10px}
+.ex-row{display:grid;grid-template-columns:104px 1fr;gap:8px;margin-top:8px;font-size:14px;line-height:1.55}.ex-row b{font-size:12.5px;color:var(--muted);padding-top:2px}
+.tg{flex:none;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px}
+.pn{font-weight:800;font-size:16px;color:var(--ink);border-bottom:2px dotted var(--accent);padding:0 1px}
+.modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;padding:12px;animation:fi .15s}
+.sheet{width:100%;max-width:560px;max-height:80vh;overflow:auto;padding:18px;animation:pop .2s ease-out}
+@media(min-width:640px){.modal{align-items:center}}
 .accbar{position:relative;height:10px;border-radius:9px;background:var(--panel2);margin-top:10px}
 .accbar i{display:block;height:100%;border-radius:9px}.accbar span{position:absolute;top:-4px;width:2px;height:18px;background:var(--ink);opacity:.6}
 .score{font-size:64px;font-weight:900;letter-spacing:-2px;line-height:1}
@@ -271,94 +275,112 @@ function render(){
 function pick(i){if(S.sel===i)answer(i);else{S.sel=i;render()}}
 function advance(){S.i++;S.i<10?next():result()}
 /* ---------- 자동 해설 ----------
-   정답 공개 때 차트 데이터를 규칙으로 분석해서 '문제를 풀 때 보였던 단서'와 '정답 근거'를 만든다. */
-const TAG={candle:["캔들","#e5484d"],trend:["추세","#3b82f6"],pattern:["패턴","#a855f7"],combo:["캔들 조합","#f59e0b"],vol:["변동성","#10b981"],volume:["거래량","#06b6d4"],gap:["갭","#ec4899"],option:["보기 비교","#64748b"]};
-function cinfo(k,prev){const [o,h,l,c]=k,rng=Math.max(h-l,1e-9),body=Math.abs(c-o);
-  return {up:c>=o,body:body/rng,upW:(h-Math.max(o,c))/rng,dnW:(Math.min(o,c)-l)/rng,ret:prev?c/prev-1:0,size:rng/(prev||o)}}
+   정답 공개 때 차트 숫자를 규칙으로 분석해, 빈칸 모양을 추론하는 데 실제로 쓸모 있는 단서만 골라
+   '무엇을 보고 → 그래서 빈칸은 → 실제로' 순서로 설명한다. 패턴 이름은 눌러서 팝업으로 설명을 볼 수 있다. */
 const sd=a=>{const m=a.reduce((x,y)=>x+y,0)/a.length;return Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/Math.max(a.length-1,1))};
 const rets=cs=>cs.slice(1).map((k,i)=>Math.log(k[3]/cs[i][3]));
-function slopePct(cs){const n=cs.length;if(n<3)return 0;return (cs[n-1][3]/cs[0][3]-1)*100}
 const pct1=v=>(v>0?"+":"")+v.toFixed(1)+"%";
-function candleName(k,prev,size){const c=cinfo(k,prev);
-  if(c.body<.12&&c.upW>.25&&c.dnW>.25)return "도지(힘이 팽팽)";
-  if(c.dnW>.55&&c.body<.35)return "아래꼬리 긴 봉(망치형 계열)";
-  if(c.upW>.55&&c.body<.35)return "윗꼬리 긴 봉";
-  if(c.body>.7&&c.size>size*1.6)return c.up?"장대양봉":"장대음봉";
-  return null}
-function combos(cs,c0){ // cs: 연속 캔들 3개 이상, 끝 기준으로 조합 찾기
-  const out=[],n=cs.length;if(n<3)return out;const [a,b,c]=cs.slice(-3),I=x=>cinfo(x);
-  const up=x=>x[3]>x[0],big=x=>I(x).body>.55;
-  if(up(a)&&up(b)&&up(c)&&b[3]>a[3]&&c[3]>b[3]&&big(a)&&big(b)&&big(c))out.push("적삼병(양봉 3개 연속 상승)");
-  if(!up(a)&&!up(b)&&!up(c)&&b[3]<a[3]&&c[3]<b[3]&&big(a)&&big(b)&&big(c))out.push("흑삼병(음봉 3개 연속 하락)");
-  if(!up(b)&&up(c)&&c[3]>=b[0]&&c[0]<=b[3]&&Math.abs(c[3]-c[0])>Math.abs(b[3]-b[0])*1.2)out.push("상승 장악형");
-  if(up(b)&&!up(c)&&c[3]<=b[0]&&c[0]>=b[3]&&Math.abs(c[3]-c[0])>Math.abs(b[3]-b[0])*1.2)out.push("하락 장악형");
-  if(!up(a)&&big(a)&&I(b).body<.3&&up(c)&&big(c)&&c[3]>(a[0]+a[3])/2)out.push("샛별형");
-  if(up(a)&&big(a)&&I(b).body<.3&&!up(c)&&big(c)&&c[3]<(a[0]+a[3])/2)out.push("석별형");
-  return out}
+const chg=(a,b)=>(b/a-1)*100;
+function cinfo(k){const [o,h,l,c]=k,rng=Math.max(h-l,1e-9);return {up:c>=o,body:Math.abs(c-o)/rng,upW:(h-Math.max(o,c))/rng,dnW:(Math.min(o,c)-l)/rng}}
+// 사전에 없는 이름의 짧은 설명
+const EXTRA={
+ "꾸준한 상승":{p:"큰 되돌림 없이 한 방향으로 곧게 오르는 흐름이에요.",after:"뚜렷한 반전 신호가 나오기 전까지는 같은 기울기가 이어지는 경우가 많아요.",guess:"양 끝을 잇는 직선에 가깝고 캔들 크기가 양옆과 비슷한 보기를 고르세요.",c:[10,11.5,12.4,13.8,14.6,16,17.1,18.5]},
+ "꾸준한 하락":{p:"큰 반등 없이 한 방향으로 곧게 내리는 흐름이에요.",after:"바닥 신호(긴 아래꼬리, 거래량 폭증)가 나오기 전까지 이어지는 경우가 많아요.",guess:"양 끝을 잇는 직선에 가까운 보기를 고르세요.",c:[18.5,17.1,16,14.6,13.8,12.4,11.5,10]},
+ "횡보":{p:"큰 방향 없이 좁은 범위에서 오르내려요.",after:"에너지가 모이는 구간이라 끝난 뒤 한쪽으로 크게 움직이는 경우가 많아요.",guess:"캔들이 작고 위아래로 고르게 섞인 보기를 고르세요.",c:[14,15,14.2,15.1,14.1,14.9,14.3,15]},
+ "장대양봉":{p:"몸통이 아주 긴 양봉. 그날 사려는 힘이 압도적이었다는 뜻이에요.",after:"우리 데이터에선 크게 오른 날 다음 5일 평균 -0.4%, 더 오른 경우 42%로 살짝 되돌리는 편이었어요.",guess:"빈칸 바로 앞이 장대양봉이면 빈칸 초반은 숨 고르기(작은 캔들, 살짝 하락)일 가능성을 생각하세요.",k:[[10,21,9.5,20.5]]},
+ "장대음봉":{p:"몸통이 아주 긴 음봉. 그날 팔려는 힘이 압도적이었다는 뜻이에요.",after:"급락 뒤에는 뚜렷한 방향이 없었어요. 대신 며칠간 출렁임이 커지는 경향이 있어요.",guess:"빈칸 초반 캔들이 큰 보기를 우선 보세요.",k:[[20,20.5,9.5,10]]},
+ "망치형":{p:"아래꼬리가 몸통보다 훨씬 긴 봉. 크게 밀렸다가 회복했다는 뜻이에요.",after:"하락 끝에 나오면 반등 신호로 봐요.",guess:"하락 뒤 빈칸 앞에 망치형이 있으면 빈칸 초반 반등 보기를 고르세요.",k:[[17,18,8,18]]},
+ "윗꼬리 긴 봉":{p:"윗꼬리가 몸통보다 훨씬 긴 봉. 올랐다가 되밀렸다는 뜻이에요.",after:"상승 끝에 나오면 힘이 빠지는 신호로 봐요.",guess:"상승 뒤 빈칸 앞에 이 봉이 있으면 빈칸 초반이 꺾이는 보기를 고르세요.",k:[[12,21,11.5,11]]},
+ "변동성 이어짐":{p:"잠잠한 종목은 계속 잠잠하고, 요동치는 종목은 계속 요동치는 경향이에요.",after:"우리 데이터에서 직전 20일 움직임이 작은 종목은 다음 10일 움직임이 0.6배, 큰 종목은 1.6배였어요. 빈칸 문제에서 가장 믿을 만한 단서예요.",guess:"양옆 캔들 크기와 어울리지 않게 크거나 작은 보기를 먼저 지우세요."},
+ "갭":{p:"시가가 전날 종가와 크게 벌어져 캔들 사이에 빈 공간이 생긴 것이에요.",after:"밤사이 뉴스·공시가 있었다는 신호예요. 갭 뒤에는 그 방향으로 이어지거나 갭을 메우러 되돌아오는 경우가 있어요.",guess:"빈칸 오른쪽 첫 캔들이 갭으로 시작하면 빈칸 마지막 캔들은 갭 직전의 가격에서 끝나요."},
+};
+function patInfo(name){
+  const key=name.replace(/\s*\(.*\)$/,"");
+  for(const tab of Object.values(LESSONS))for(const it of tab.items){const h=it.h.replace(/\s*\(.*\)$/,"");if(h===key)return {h:it.h,html:it.p+(it.fig?it.fig():"")}}
+  const e=EXTRA[key];if(!e)return null;
+  const fig=e.c?`<div class="fig">${mini(path(e.c),{h:110})}</div>`:e.k?`<div class="fig" style="max-width:160px">${mini(e.k,{w:110,h:110})}</div>`:"";
+  return {h:key,html:e.p+fig+`<div class="pat"><div><b>📈 이후 경향</b>${e.after}</div><div><b>🎯 빈칸에서는</b>${e.guess}</div></div>`};
+}
+function showPat(name){
+  const info=patInfo(name);if(!info)return;
+  const el=document.createElement("div");el.className="modal";el.onclick=e=>{if(e.target===el)el.remove()};
+  el.innerHTML=`<div class="sheet card"><div class="row"><b style="font-size:19px">${info.h}</b><span class="sp"></span><button class="muted" style="font-size:22px" onclick="this.closest('.modal').remove()" aria-label="닫기">✕</button></div><p class="sm muted" style="line-height:1.6;margin:8px 0 0">${info.html}</p></div>`;
+  document.body.appendChild(el);
+}
+const PN=n=>`<button class="pn" onclick="showPat('${n}')">${n}</button>`;
+
 function analyze(q){
   const p=q.p,{L:l,G:g,R:r}=p.layout,ctx=p.candles,left=ctx.slice(0,l),right=ctx.slice(l),real=p.options[0];
-  const c0=left[l-1][3],cEnd=real[g-1][3],full=[...left,...real,...right],clues=[],why=[],opts=[];
-  const sL=sd(rets(left))*100,sR=sd(rets(right))*100,sG=sd(rets([left[l-1],...real]))*100,sCtx=(sL+sR)/2;
-  const avgSize=a=>a.reduce((x,k,i)=>x+(k[1]-k[2])/(i?a[i-1][3]:k[0]),0)/a.length,szCtx=(avgSize(left)+avgSize(right))/2;
-  // 1) 양 끝 높이
-  const net=(cEnd/c0-1)*100;
-  clues.push(["trend",`빈칸 양 끝의 높이 차이는 <b>${pct1(net)}</b>예요. 모든 보기가 같은 곳에서 출발해 같은 곳에서 끝나니, 빈칸 전체로는 ${Math.abs(net)<2?"<b>제자리</b>로 돌아왔다는":net>0?"<b>올랐다</b>는":"<b>내렸다</b>는"} 것까지는 처음부터 알 수 있었어요.`]);
-  // 2) 추세
-  const tl=slopePct(left.slice(-12)),tr=slopePct(right.slice(0,12));
-  const word=v=>Math.abs(v)<4?"옆으로 기는 흐름":v>0?"상승 흐름":"하락 흐름";
-  clues.push(["trend",`빈칸 앞 12봉은 ${word(tl)}(${pct1(tl)}), 빈칸 뒤 12봉은 ${word(tr)}(${pct1(tr)})이었어요.`]);
-  // 3) 변동성
+  const c0=left[l-1][3],cEnd=real[g-1][3],net=chg(c0,cEnd),items=[];
+  const sCtx=(sd(rets(left))+sd(rets(right)))/2*100,sG=sd(rets([left[l-1],...real]))*100;
+  const closes=real.map(k=>k[3]),cMax=Math.max(...closes),cMin=Math.min(...closes),iMax=closes.indexOf(cMax),iMin=closes.indexOf(cMin);
+  const pre=left.slice(-10),post=right.slice(0,10),preC=pre.map(k=>k[3]);
+  const preHi=Math.max(...pre.map(k=>k[1])),preLo=Math.min(...pre.map(k=>k[2]));
+  const lead=chg(left[Math.max(l-9,0)][3],c0);           // 빈칸 앞 8봉의 움직임
+  const mid=i=>i>g*.2&&i<g*.8, bigMove=Math.max(5,2.5*sCtx);
+  // ── 패턴 (실제 빈칸 경로로 판정하고, 보이는 단서로 설명) ──
+  let pat=null;
+  const dip=chg(c0,cMin),pop=chg(c0,cMax);
+  const boxW=chg(Math.min(...preC),Math.max(...preC));
+  if(mid(iMin)&&dip<-bigMove&&cEnd>cMin*1.04)
+    pat={n:"V자 반등",seen:`빈칸 앞 8봉이 ${pct1(lead)} ${lead<0?"급하게 떨어지는 중":"움직였고"}이었는데, 빈칸 오른쪽은 ${pct1(net)} 높이에서 다시 시작해요.`,
+      so:"떨어지던 흐름이 빈칸 안에서 바닥을 찍고 돌아섰다는 뜻이에요. 양 끝 높이만 보면 직선처럼 보여도, 빈칸 안에 '깊은 바닥'이 숨어 있을 수 있어요.",
+      real:`실제로 빈칸 한가운데서 ${pct1(dip)}까지 빠졌다가 회복했어요.`};
+  else if(mid(iMax)&&pop>bigMove&&cEnd<cMax*.96)
+    pat={n:"급등 후 되돌림",seen:`빈칸 오른쪽 캔들이 ${lead>0?"빈칸 앞의 상승 흐름보다 낮은 곳에서":"생각보다 낮은 곳에서"} 이어지고, 오른쪽 초반이 ${chg(right[0][3],right[Math.min(5,r-1)][3])<0?"계속 밀리는":"힘이 약한"} 모습이에요.`,
+      so:"빈칸 안에서 크게 올랐다가 상당 부분을 반납했을 때 이렇게 보여요. 크게 오른 뒤엔 일부를 되돌리는 경향이 있어요.",
+      real:`실제로 빈칸 안에서 ${pct1(pop)}까지 올랐다가 ${pct1(net)}에서 끝났어요.`};
+  else if(boxW<8&&Math.abs(net)>Math.max(6,boxW*1.2)&&Math.abs(lead)<4)
+    pat={n:"박스권 돌파",seen:`빈칸 앞 10봉은 폭 ${boxW.toFixed(0)}%의 좁은 박스에서만 움직였는데, 빈칸 오른쪽은 박스 ${net>0?"위":"아래"}(${pct1(net)})에서 시작해요.`,
+      so:`박스를 벗어난 순간이 빈칸 안에 있다는 뜻이에요. 박스 안에서 얌전히 움직이다가 어느 순간 ${net>0?"위로":"아래로"} 튀어 나가는 모양이 정답일 가능성이 커요.`,
+      real:`실제로 ${iMax>g/2||iMin>g/2?"빈칸 후반":"빈칸 초반"}에 박스를 벗어났어요.`};
+  else if(Math.abs(lead)>8&&chg(Math.min(...real.map(k=>k[2])),Math.max(...real.map(k=>k[1])))<Math.abs(lead)*.7&&Math.sign(net||lead)===Math.sign(lead))
+    pat={n:lead>0?"상승 깃발":"하락 깃발",seen:`빈칸 앞 8봉이 ${pct1(lead)}로 급하게 ${lead>0?"올랐고":"내렸고"}, 빈칸 오른쪽도 같은 방향 쪽에서 이어져요.`,
+      so:"급한 움직임 뒤엔 잠깐 좁게 쉬었다가 원래 방향으로 다시 가는 경우가 많아요. 빈칸은 '좁은 박스에서 쉬는 구간'일 가능성이 커요.",
+      real:`실제로 빈칸 안 움직임 폭이 앞선 급등락의 70%도 안 될 만큼 좁았어요.`};
+  else if(lead<0&&Math.abs(chg(Math.min(...left.slice(-15).map(k=>k[2])),Math.min(...real.map(k=>k[2]))))<3&&cEnd>cMin*1.05)
+    pat={n:"쌍바닥",seen:`빈칸 앞에서 한 번 바닥(저점)을 찍고 반등했고, 빈칸 오른쪽은 그 바닥보다 높은 곳에서 시작해요.`,
+      so:"같은 가격대에서 한 번 더 받쳐 주면(두 번째 바닥) 하락이 끝났다는 신호로 봐요. 빈칸은 '한 번 더 내려갔다가 같은 높이에서 돌아오는' 모양일 수 있어요.",
+      real:`실제로 빈칸 안 저점이 앞의 저점과 3% 안쪽 차이로 거의 같았어요.`};
+  else if(lead>0&&Math.abs(chg(Math.max(...left.slice(-15).map(k=>k[1])),Math.max(...real.map(k=>k[1]))))<3&&cEnd<cMax*.95)
+    pat={n:"쌍봉",seen:`빈칸 앞에서 한 번 고점을 찍고 밀렸고, 빈칸 오른쪽은 그 고점보다 낮은 곳에서 시작해요.`,
+      so:"같은 가격대에서 한 번 더 막히면(두 번째 고점) 상승이 끝났다는 신호로 봐요. 빈칸은 '한 번 더 올라갔다가 같은 높이에서 꺾이는' 모양일 수 있어요.",
+      real:`실제로 빈칸 안 고점이 앞의 고점과 3% 안쪽 차이로 거의 같았어요.`};
+  else{const swing=pop-dip,eff=Math.abs(net)/Math.max(swing,1e-6);
+    if(eff>.75&&Math.abs(net)>3)pat={n:net>0?"꾸준한 상승":"꾸준한 하락",seen:`빈칸 양 끝 높이 차이가 ${pct1(net)}이고, 앞뒤에 꺾이는 신호가 없어요.`,
+      so:"이럴 땐 큰 되돌림 없이 곧게 이어졌을 가능성이 커요.",real:`실제로 빈칸 내내 한 방향으로 비교적 곧게 움직였어요.`};
+    else if(swing<Math.max(6,3*sCtx))pat={n:"횡보",seen:`빈칸 양 끝 높이가 비슷하고(${pct1(net)}) 양옆 캔들도 작아요.`,
+      so:"크게 움직일 이유가 보이지 않으면 좁게 오르내렸을 가능성이 커요.",real:`실제로 빈칸 안에서 위아래 ${swing.toFixed(1)}% 범위 안에서만 움직였어요.`};}
+  if(pat)items.push({tag:"pattern",...pat});
+  // ── 변동성: 보기를 지울 수 있었을 때만 ──
+  const elim=[];p.options.slice(1).forEach((o,k)=>{const s=sd(rets([left[l-1],...o]))*100,ratio=s/Math.max(sCtx,1e-6);if(ratio>1.6||ratio<.55)elim.push([k+1,ratio])});
   const vr=sG/Math.max(sCtx,1e-6);
-  clues.push(["vol",`양옆 캔들의 하루 평균 움직임은 약 ${sCtx.toFixed(1)}%예요. 실제 빈칸은 ${sG.toFixed(1)}%로 ${vr<.75?"<b>더 잠잠했어요</b>":vr>1.35?"<b>더 거칠었어요</b>":"<b>양옆과 비슷했어요</b>"}. ${vr>=.75&&vr<=1.35?"'변동성은 이어진다'는 경향대로예요.":"이런 경우는 변동성 단서만으로는 헷갈려요."}`]);
-  // 4) 경계 캔들 / 조합
-  const lastL=left[l-1],nm=candleName(lastL,left[l-2]&&left[l-2][3],szCtx);
-  if(nm)clues.push(["candle",`빈칸 바로 앞 캔들이 <b>${nm}</b>이었어요.${nm.startsWith("장대양")?" 큰 상승 뒤엔 살짝 되돌리는 경향이 있어요(데이터상 5일 평균 -0.4%).":nm.includes("망치")&&tl<0?" 하락 끝의 아래꼬리는 반등 신호로 봐요.":nm.includes("윗꼬리")&&tl>0?" 상승 끝의 윗꼬리는 힘이 빠지는 신호로 봐요.":""}`]);
-  combos(left.slice(-3)).forEach(cn=>clues.push(["combo",`빈칸 앞 3봉이 <b>${cn}</b> 모양이었어요.`]));
-  // 5) 갭
-  const g1=right[0][0]/cEnd-1;
-  if(Math.abs(g1)*100>Math.max(2*sCtx,3))clues.push(["gap",`빈칸 오른쪽 첫 캔들이 ${pct1(g1*100)} <b>갭</b>으로 시작했어요. 빈칸 마지막 종가와 오른쪽 시가가 벌어져 있다는 뜻이에요.`]);
-  // 6) 거래량
-  if(p.volume){const vL=p.volume.slice(0,l),vR=p.volume.slice(l),mean=[...vL,...vR].reduce((a,b)=>a+b,0)/(l+r);
-    const edge=Math.max(...vL.slice(-2),...vR.slice(0,2));
-    if(edge>mean*2.5)clues.push(["volume",`빈칸 바로 옆에서 <b>거래량이 평소의 ${(edge/mean).toFixed(1)}배</b>로 터졌어요. 거래량이 터진 근처는 캔들이 커지는 경향이 있어요.`]);}
-  // ---- 정답 근거: 실제 빈칸 경로 분석 ----
-  const closes=real.map(k=>k[3]),hi=Math.max(...real.map(k=>k[1])),lo=Math.min(...real.map(k=>k[2]));
-  const iMax=closes.indexOf(Math.max(...closes)),iMin=closes.indexOf(Math.min(...closes));
-  const upMove=(hi/c0-1)*100,dnMove=(lo/c0-1)*100,swing=upMove-dnMove;
-  const pre=left.slice(-10).map(k=>k[3]),post=right.slice(0,10).map(k=>k[3]);
-  const mid=(i,n)=>i>n*.2&&i<n*.8;
-  const pats=[];
-  if(mid(iMin,g)&&(Math.min(...closes)/c0-1)*100<-Math.max(5,2.5*sCtx)&&cEnd>Math.min(...closes)*1.04)pats.push(["V자 반등","빈칸 한가운데서 크게 빠졌다가 회복했어요"]);
-  if(mid(iMax,g)&&(Math.max(...closes)/c0-1)*100>Math.max(5,2.5*sCtx)&&cEnd<Math.max(...closes)*.96)pats.push(["급등 후 되돌림(역V)","빈칸 안에서 크게 올랐다가 상당 부분 반납했어요"]);
-  const boxL=Math.max(...pre)/Math.min(...pre)-1,boxG=hi/lo-1;
-  if(boxL<.08&&Math.abs(net)>Math.max(6,boxL*100*1.2)&&Math.abs(tl)<4)pats.push(["박스권 돌파",`좁은 박스(폭 ${(boxL*100).toFixed(0)}%)에서 쉬다가 빈칸에서 ${net>0?"위":"아래"}로 벗어났어요`]);
-  if(Math.abs(tl)>8&&boxG<Math.abs(tl)/100*.7&&Math.sign(tr||tl)===Math.sign(tl))pats.push([tl>0?"상승 깃발":"하락 깃발","급한 움직임 뒤 빈칸에서 좁게 쉬어 갔어요"]);
-  const lowsL=Math.min(...left.slice(-15).map(k=>k[2]));if(Math.abs(lo/lowsL-1)<.03&&iMin>0&&cEnd>lo*1.05&&tl<0)pats.push(["쌍바닥","빈칸 안 저점이 빈칸 앞 저점과 거의 같은 높이에서 받쳐졌어요"]);
-  const highsL=Math.max(...left.slice(-15).map(k=>k[1]));if(Math.abs(hi/highsL-1)<.03&&cEnd<hi*.95&&tl>0)pats.push(["쌍봉","빈칸 안 고점이 빈칸 앞 고점에서 다시 막혔어요"]);
-  if(!pats.length){const eff=Math.abs(net)/Math.max(swing,1e-6);
-    if(eff>.75&&Math.abs(net)>3)pats.push([net>0?"꾸준한 상승":"꾸준한 하락","빈칸 내내 한 방향으로 비교적 곧게 움직였어요"]);
-    else if(swing<Math.max(6,3*sCtx))pats.push(["횡보","빈칸 안에서 큰 방향 없이 좁게 오르내렸어요"]);
-    else pats.push(["출렁임",`빈칸 안에서 위로 ${pct1(upMove)}, 아래로 ${pct1(dnMove)}까지 흔들렸어요`]);}
-  pats.forEach(([n,d])=>why.push(["pattern",`실제 빈칸은 <b>${n}</b>에 가까워요. ${d}.`]));
-  why.push(["trend",`빈칸 안 최고 ${pct1(upMove)}, 최저 ${pct1(dnMove)}. ${iMax<iMin?"먼저 오르고 나중에 내렸어요.":"먼저 내리고 나중에 올랐어요."}`]);
-  const nmIn=real.map((k,i)=>candleName(k,i?real[i-1][3]:c0,szCtx)).filter(Boolean);
-  const big=nmIn.filter(x=>x.startsWith("장대"));if(big.length)why.push(["candle",`빈칸 안에 ${[...new Set(big)].join(", ")}이 ${big.length}개 있었어요.`]);
-  const cin=[];for(let i=2;i<g;i++)combos(real.slice(i-2,i+1)).forEach(x=>cin.push(x));if(cin.length)why.push(["combo",`빈칸 안에서 ${[...new Set(cin)].slice(0,2).join(", ")}이 나왔어요.`]);
-  // ---- 보기 비교: 오답이 왜 티 났는지 ----
-  p.options.slice(1).forEach((o,k)=>{const s=sd(rets([left[l-1],...o]))*100,ratio=s/Math.max(sCtx,1e-6),src=q.r.decoy_sources[k];
-    let why2=src=="mirror"?"실제 모양을 위아래로 뒤집은 것이라 흐름 방향이 정반대예요":ratio>1.5?`캔들 움직임이 양옆보다 ${ratio.toFixed(1)}배 커서 어색했어요`:ratio<.6?`캔들 움직임이 양옆의 ${ratio.toFixed(1)}배밖에 안 돼 너무 얌전했어요`:null;
-    opts.push([k+1,why2,SRC[src]||""])});
-  return {clues,why,opts};
+  if(elim.length&&vr>.7&&vr<1.4){const pos={};if(cfg.type=="choice4")S.order.forEach((k,i)=>pos[k]=i+1);
+    const names=elim.map(([k,ra])=>`${cfg.type=="choice4"?pos[k]+"번":"가짜 "+k}(${ra>1?ra.toFixed(1)+"배 큼":ra.toFixed(1)+"배로 작음"})`).join(", ");
+    items.push({tag:"vol",n:"변동성 이어짐",seen:`양옆 캔들의 하루 평균 움직임은 ${sCtx.toFixed(1)}%예요.`,so:`빈칸도 비슷한 크기로 움직였을 거라 보고, 크기가 어울리지 않는 보기 ${names}를 먼저 지울 수 있었어요.`,real:`실제 빈칸은 ${sG.toFixed(1)}%로 양옆과 비슷했어요.`});}
+  // ── 갭: 클 때만 ──
+  const gp=chg(cEnd,right[0][0]);
+  if(Math.abs(gp)>Math.max(2*sCtx,3))items.push({tag:"gap",n:"갭",seen:`빈칸 오른쪽 첫 캔들이 ${pct1(gp)} 갭으로 시작해요.`,so:`그래서 빈칸 마지막 캔들은 오른쪽 시가보다 ${gp>0?"한참 아래":"한참 위"}에서 끝나요. 오른쪽 첫 캔들 높이를 빈칸 끝으로 착각하지 마세요.`,real:`실제 빈칸은 ${pct1(net)}에서 끝났어요.`});
+  // ── 경계 캔들 신호: 강한 신호일 때만, 맞았는지까지 ──
+  const k0=left[l-1],ci=cinfo(k0),rng0=(k0[1]-k0[2])/(left[l-2]?left[l-2][3]:k0[0])*100;
+  let sig=null;
+  if(ci.body>.7&&rng0>2.2*sCtx)sig=ci.up?["장대양봉",-1]:["장대음봉",0];
+  else if(ci.dnW>.55&&ci.body<.35&&lead<-3)sig=["망치형",1];
+  else if(ci.upW>.55&&ci.body<.35&&lead>3)sig=["윗꼬리 긴 봉",-1];
+  if(sig&&sig[1]!==0){const early=chg(c0,real[Math.min(2,g-1)][3]),hit=Math.sign(early)===sig[1];
+    items.push({tag:"candle",n:sig[0],seen:`빈칸 바로 앞 캔들이 ${sig[0]}이에요.`,so:sig[1]>0?"보통 빈칸 초반이 반등으로 시작한다고 봐요.":"보통 빈칸 초반이 숨 고르기(살짝 하락)로 시작한다고 봐요.",real:`실제 빈칸 첫 3봉은 ${pct1(early)}로 ${hit?"<b>신호대로</b> 움직였어요.":"<b>신호와 반대로</b> 움직였어요. 캔들 신호는 이렇게 빗나가기도 해요."}`});}
+  if(!items.length)items.push({tag:"pattern",n:null,seen:"이번 빈칸에는 이름 붙일 만한 뚜렷한 모양이 없었어요.",so:"이럴 땐 양 끝 높이 차이와 양옆 캔들 크기(변동성)에 가장 잘 맞는 보기를 고르는 게 최선이에요.",real:`실제로 빈칸 안에서 위로 ${pct1(pop)}, 아래로 ${pct1(dip)} 사이를 오갔어요.`});
+  return items;
 }
+const TAG={pattern:["패턴","#a855f7"],vol:["변동성","#10b981"],gap:["갭","#ec4899"],candle:["캔들","#e5484d"]};
 function explainCard(q){
-  const a=analyze(q),li=([tg,txt])=>`<li><span class="tg" style="background:${TAG[tg][1]}22;color:${TAG[tg][1]}">${TAG[tg][0]}</span><span>${txt}</span></li>`;
-  const pos={};if(cfg.type=="choice4")S.order.forEach((k,i)=>pos[k]=i+1);
-  const opt=a.opts.map(([k,w,src])=>{const label=cfg.type=="choice4"?`${pos[k]}번 보기`:`가짜 보기 ${k}`;return w?li(["option",`<b>${label}</b>: ${w}.${src&&!w.startsWith("실제 모양을")?` (출처: ${src})`:""}`]):""}).join("");
-  return `<div class="card explain"><div class="row"><b style="font-size:17px">🔍 자동 해설</b><span class="sp"></span><span class="xs muted">차트 데이터로 자동 분석</span></div>
-  <div class="ex-h">문제에서 보였던 단서</div><ul>${a.clues.map(li).join("")}</ul>
-  <div class="ex-h">정답 근거</div><ul>${a.why.map(li).join("")}</ul>
-  ${opt?`<div class="ex-h">오답이 티 났던 점</div><ul>${opt}</ul>`:""}
-  <p class="xs muted" style="margin:10px 0 0">규칙으로 자동 찾은 단서라 틀릴 수 있어요. 자세한 설명은 <button class="xs" style="text-decoration:underline;color:var(--accent)" onclick="study('pattern')">패턴 사전</button>에 있어요.</p></div>`;
+  const items=analyze(q);
+  return `<div class="card explain"><div class="row"><b style="font-size:17px">🔍 해설</b><span class="sp"></span><span class="xs muted">이 차트를 자동 분석</span></div>
+  ${items.map(it=>`<div class="ex-item"><div class="row" style="gap:8px"><span class="tg" style="background:${TAG[it.tag][1]}22;color:${TAG[it.tag][1]}">${TAG[it.tag][0]}</span>${it.n?PN(it.n):""}</div>
+    <div class="ex-row"><b>👀 보이는 단서</b><span>${it.seen}</span></div>
+    <div class="ex-row"><b>💭 그래서 빈칸은</b><span>${it.so}</span></div>
+    <div class="ex-row"><b>✅ 실제로는</b><span>${it.real}</span></div></div>`).join("")}
+  <p class="xs muted" style="margin:6px 0 0">패턴 이름을 누르면 설명이 떠요. 규칙으로 찾은 단서라 틀릴 수 있어요.</p></div>`;
 }
 function answer(c){
   if(!S||S.done)return;clearInterval(timer);const el=performance.now()-S.t0,q=S.q;
