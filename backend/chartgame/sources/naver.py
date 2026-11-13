@@ -46,8 +46,8 @@ def fetch(code: str, interval: str, count: int = config.NAVER_COUNT,
         _throttle()
         try:
             r = s.get(config.NAVER_URL, params=params, timeout=20)
-            if r.status_code == 200 and "<chartdata" in r.text:
-                return parse_xml(r.text)
+            if r.status_code == 200 and "<protocol" in r.text:
+                return parse_xml(r.text)  # 데이터가 없는 종목은 `<protocol />` 만 온다 → 빈 표
             err = RuntimeError(f"HTTP {r.status_code}")
         except requests.RequestException as e:  # noqa: PERF203
             err = e

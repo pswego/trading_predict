@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data          # 가격 원본(Parquet)과 문제 DB(SQLite)
+    environment:
+      CHARTGAME_SECRET: "${CHARTGAME_SECRET:-change-me-in-production}"
+      ENABLE_SCHEDULER: "1"   # 평일 18:30(KST) 증분 수집 + 문제 재생성
+    restart: unless-stopped

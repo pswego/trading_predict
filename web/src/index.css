@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Noto Sans KR", "Malgun Gothic", "Segoe UI", sans-serif;
+}
+
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel2: #1f2733;
+  --line: #2b3442;
+  --ink: #e6edf3;
+  --muted: #8b96a5;
+  --up: #f0484e;
+  --down: #4c8dff;
+  --accent: #f2c94c;
+  --accent-ink: #1a1400;
+  --good: #2fbf71;
+  --bad: #ff8a3d;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --panel2: #eef1f5;
+    --line: #dce1e8;
+    --ink: #1b1f24;
+    --muted: #5f6b7a;
+    --up: #e03131;
+    --down: #1c6fe0;
+    --accent: #f2c94c;
+    --accent-ink: #1a1400;
+    --good: #12894a;
+    --bad: #d9480f;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --panel2: #eef1f5;
+  --line: #dce1e8;
+  --ink: #1b1f24;
+  --muted: #5f6b7a;
+  --up: #e03131;
+  --down: #1c6fe0;
+  --accent: #f2c94c;
+  --accent-ink: #1a1400;
+  --good: #12894a;
+  --bad: #d9480f;
+  color-scheme: light;
+}
+:root[data-colors="us"] {
+  --up: #1fa971;
+  --down: #f0484e;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+button {
+  cursor: pointer;
+  font: inherit;
+}
+button:disabled {
+  cursor: default;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes candle-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes shake {
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+.pop-in {
+  animation: pop-in 0.22s ease-out both;
+}
+.shake {
+  animation: shake 0.35s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
