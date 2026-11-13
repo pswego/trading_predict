@@ -48,7 +48,8 @@ button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
 .timer i.hurry{background:var(--bad)}
 .tags{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px}.tags span{font-size:12px;padding:4px 9px;border-radius:8px;background:var(--panel2);color:var(--muted);font-weight:600}
 .main{padding:8px 6px 4px;overflow:hidden}
-.q{font-size:17px;font-weight:800;margin:18px 2px 10px}
+.q{font-size:17px;font-weight:800;margin:18px 2px 10px}.fitq{font-size:15px;margin:10px 2px 8px}
+.fit .tags{margin:0 0 6px}.fit .top{padding-bottom:6px}.fit .bottom{padding-top:8px}.fit .grid{gap:8px}.fit .opt{padding:6px 4px 4px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .opt{position:relative;padding:8px 6px 6px;border-radius:18px;background:var(--panel);border:2px solid var(--line);transition:transform .12s,border-color .12s;text-align:left}
 .opt:active{transform:scale(.98)}
@@ -74,6 +75,19 @@ button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
 .shake{animation:shake .3s}
 svg{display:block;width:100%;height:auto}
 
+/* 공부 */
+.study-entry{display:flex;align-items:center;gap:12px;width:100%;padding:16px;margin-top:12px}
+.study-entry .ic{width:42px;height:42px;border-radius:12px;background:var(--panel2);display:grid;place-items:center;font-size:20px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:6px 0 14px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+.tabs button{white-space:nowrap;padding:9px 14px;border-radius:999px;background:var(--panel2);color:var(--muted);font-weight:700;font-size:14px}
+.tabs button.on{background:var(--ink);color:var(--bg)}
+.lesson{padding:16px;margin-bottom:12px}.lesson h3{margin:0 0 4px;font-size:17px}.lesson p{margin:6px 0 0;line-height:1.6;font-size:14.5px;color:var(--muted)}
+.lesson .fig{background:var(--panel2);border-radius:14px;padding:8px;margin-top:12px}
+.lesson .tip{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,211,77,.1);font-size:13.5px;line-height:1.55}
+.figs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:12px}
+.figs>div{background:var(--panel2);border-radius:14px;padding:8px 8px 10px;text-align:center;font-size:13px}
+.figs b{display:block;margin-top:4px;font-size:14px}
+.stat-big{font-size:30px;font-weight:900;letter-spacing:-1px}
 /* 결과 */
 .score{font-size:64px;font-weight:900;letter-spacing:-2px;line-height:1}
 .list div.item{display:flex;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid var(--line)}
@@ -99,7 +113,7 @@ const key=q=>q.r.code+q.r.gap_start;
 function chart(p,fill,o={}){
   const {L:l,G:g,R:r}=p.layout,N=l+g+r,c=p.candles,thumb=!!o.thumb,side=thumb?ZOOM.thumb:ZOOM.main;
   const i0=Math.max(l-side,0),i1=Math.min(l+g+side,N);
-  const W=thumb?220:720,H=thumb?150:(innerWidth<560?560:400),pr=thumb?4:(innerWidth<560?78:50),vol=!thumb&&p.volume;
+  const W=thumb?220:720,H=thumb?(o.th||150):(o.mh||(innerWidth<560?560:400)),pr=thumb?4:(innerWidth<560?78:50),vol=!thumb&&p.volume;
   const top=thumb?8:14,pb=vol?H*.78:H-8;
   const vis=[];for(let i=i0;i<i1;i++){if(i<l)vis.push([i,c[i]]);else if(i>=l+g)vis.push([i,c[i-g]])}
   let lo=1e9,hi=-1e9;for(const grp of [vis.map(v=>v[1]),fill,o.ghost,...(o.range||[])])if(grp)for(const k of grp){lo=Math.min(lo,k[2]);hi=Math.max(hi,k[1])}
@@ -138,6 +152,7 @@ function home(){
     <div class="row xs muted" style="margin-top:16px"><span>이 조건 남은 문제</span><span class="sp"></span><b class="tnum" style="color:var(--ink)">${left}</b>&nbsp;/ ${pool.length}</div>
   </div>
   <div style="margin-top:16px"><button class="cta" onclick="start()">10문제 시작</button></div>
+  <button class="card study-entry" onclick="study()"><span class="ic">📘</span><span class="sp" style="text-align:left"><b>차트 공부하기</b><br><span class="xs muted">캔들 읽는 법 · 추세와 흐름 · 실제 데이터로 본 경향성</span></span><span class="muted">›</span></button>
   <p class="xs muted" style="text-align:center;margin-top:22px;line-height:1.7">테스트판 · 실제 문제 ${Q.length}개 수록<br>과거 데이터 기반 오락용이며 투자 권유가 아닙니다 · 가격 출처: 네이버 금융<br>
   <button class="xs muted" style="text-decoration:underline" onclick="seen.clear();save();home()">푼 문제 기록 지우기</button></p>`;
 }
@@ -162,12 +177,14 @@ function render(){
   else if(ox){fill=o[S.ox];fillVol=ov&&ov[S.ox]}
   else if(S.sel!=null){fill=o[S.order[S.sel]];fillVol=ov&&ov[S.order[S.sel]]}
   const range=ox?[o[0],o[S.ox]]:o;
+  const fit=!ox&&!S.done, cw=Math.min(innerWidth,720)-44, vh=innerHeight;
+  const mh=fit?Math.max(200,Math.round(vh*.30*720/cw)):undefined, tw=(cw-10)/2-12, th=fit?Math.max(80,Math.round(vh*.135*220/tw)):undefined;
   const dots=Array.from({length:10},(_,i)=>`<i class="${i<S.res.length?(S.res[i].ok?"ok":"no"):i==S.i?"cur":""}"></i>`).join("");
   let h=`<div class="top"><div class="row"><button aria-label="그만하기" class="muted" style="font-size:22px;padding:4px 6px 4px 0" onclick="home()">✕</button>
     <b class="tnum">${S.i+1}<span class="muted"> / 10</span></b><span class="sp"></span>${S.streak>=2?`<b style="color:var(--accent)">🔥 ${S.streak}</b>`:""}<b class="tnum">${S.score.toLocaleString()}점</b></div>
     <div class="dots">${dots}</div>${S.done?"":`<div class="timer"><i id="tb" style="width:100%"></i></div>`}</div>
   <div class="tags"><span>${L[q.m]}</span><span>${L[q.t]}</span><span>${L[q.iv]}</span><span>${L[q.d]}</span></div>
-  <div class="card main">${chart(p,fill,{ghost,range,style,fillVol,id:9})}</div>`;
+  <div class="card main">${chart(p,fill,{ghost,range,style,fillVol,id:9,mh})}</div>`;
 
   if(S.done){const r=q.r,ok=S.ok,pc=v=>`<b class="${v>0?"up":v<0?"dn":""}">${v>0?"+":""}${v.toFixed(1)}%</b>`;
     const sub=ox?(S.ox===0?"보여 드린 모양이 실제였어요.":"보여 드린 모양은 가짜였어요. 흐린 것이 가짜, 선명한 것이 실제예요."):(!ok&&S.ans!=null?"흐리게 겹친 것이 내가 고른 모양이에요.":"");
@@ -180,10 +197,10 @@ function render(){
       ${r.delisted?`<p class="xs muted" style="margin:10px 0 0">이 종목은 ${r.delisted.date}에 상장폐지됐어요 (${r.delisted.reason}).</p>`:""}</div>`}
 
   if(!ox){
-    h+=`<div class="q">${S.done?"보기":"빈칸에 실제로 들어간 모양은?"}</div><div class="grid">`+S.order.map((k,i)=>{
+    h+=`<div class="q${fit?" fitq":""}">${S.done?"보기":"빈칸에 실제로 들어간 모양은?"}</div><div class="grid">`+S.order.map((k,i)=>{
       const cls=S.done?(k===0?"real":S.ans===i?"wrong":"dim"):(S.sel===i?"sel":"");
       const badge=S.done&&k===0?`<span class="badge" style="background:var(--good)">실제</span>`:S.done&&S.ans===i?`<span class="badge" style="background:var(--bad)">내 선택</span>`:"";
-      return `<button class="opt ${cls}" ${S.done?"disabled":`onclick="pick(${i})"`} aria-label="보기 ${i+1}"><span class="n">${i+1}</span>${badge}${chart(p,o[k],{thumb:true,range:o,id:i})}${S.done&&k!==0?`<div class="src">${SRC[q.r.decoy_sources[k-1]]||""}</div>`:""}</button>`}).join("")+`</div>`;
+      return `<button class="opt ${cls}" ${S.done?"disabled":`onclick="pick(${i})"`} aria-label="보기 ${i+1}"><span class="n">${i+1}</span>${badge}${chart(p,o[k],{thumb:true,range:o,id:i,th})}${S.done&&k!==0?`<div class="src">${SRC[q.r.decoy_sources[k-1]]||""}</div>`:""}</button>`}).join("")+`</div>`;
     if(!S.done)h+=`<div class="bottom"><button class="cta" ${S.sel==null?"disabled":""} onclick="answer(S.sel)">${S.sel==null?"보기를 골라 주세요":(S.sel+1)+"번으로 확정"}</button></div>`;
   } else if(!S.done){
     h+=`<div class="q" style="text-align:center">빈칸에 들어간 이 모양, 실제일까요?</div><div class="ox">
@@ -191,7 +208,7 @@ function render(){
       <button style="color:var(--bad);border-color:var(--bad)" onclick="answer('X')" aria-label="X, 가짜다">X</button></div>`;
   }
   if(S.done)h+=`<div style="margin-top:16px"><button class="cta" onclick="advance()">${S.i==9?"결과 보기":"다음 문제"}</button></div>`;
-  app.innerHTML=h;
+  app.innerHTML=h;app.classList.toggle('fit',fit);
 }
 function pick(i){if(S.sel===i)answer(i);else{S.sel=i;render()}}
 function advance(){S.i++;S.i<10?next():result()}
@@ -211,6 +228,72 @@ function result(){
   ${S.res.map(r=>`<div class="item"><span>${r.ok?"🟩":"🟥"}</span><div class="sp" style="min-width:0"><div class="b" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.q.r.name}</div><div class="xs muted">${r.q.r.gap_start} ~ ${r.q.r.gap_end}</div></div>
   <span class="sm tnum ${r.q.r.gap_return_pct>0?"up":"dn"}">${r.q.r.gap_return_pct>0?"+":""}${r.q.r.gap_return_pct.toFixed(1)}%</span><b class="tnum" style="width:42px;text-align:right">${r.pts}</b></div>`).join("")}</div>
   <div style="margin-top:16px"><button class="cta" onclick="start()">한 판 더</button><button class="ghost" onclick="copyRes('${marks}',${n})">결과 복사</button><button class="ghost" onclick="home()">처음으로</button></div><p id="note" class="xs muted" style="text-align:center"></p>`;
+}
+/* ---------- 공부하기 ---------- */
+// 그림용 캔들: [시가, 고가, 저가, 종가]
+function mini(cs,{w=280,h=120,mark=null,lines=[],label=null}={}){
+  let lo=1e9,hi=-1e9;cs.forEach(k=>{lo=Math.min(lo,k[2]);hi=Math.max(hi,k[1])});lines.forEach(l=>{lo=Math.min(lo,l.v);hi=Math.max(hi,l.v)});
+  const pad=(hi-lo)*.12||1;lo-=pad;hi+=pad;const n=cs.length,st=w/n,bw=Math.min(st*.6,26),y=v=>h-6-(v-lo)/(hi-lo)*(h-12);
+  let s=`<svg viewBox="0 0 ${w} ${h}">`;
+  if(mark)s+=`<rect x="${mark[0]*st}" y="0" width="${(mark[1]-mark[0])*st}" height="${h}" rx="8" fill="var(--accent)" opacity=".13"/>`;
+  lines.forEach(l=>s+=`<line x1="0" x2="${w}" y1="${y(l.v)}" y2="${y(l.v)}" stroke="${l.c||"var(--muted)"}" stroke-dasharray="5 4" stroke-width="1.5"/>${l.t?`<text x="${w-4}" y="${y(l.v)-5}" text-anchor="end" font-size="11" font-weight="700" fill="${l.c||"var(--muted)"}">${l.t}</text>`:""}`);
+  cs.forEach((k,i)=>{const x=st*(i+.5),u=k[3]>=k[0],col=u?"var(--up)":"var(--down)",t=y(Math.max(k[0],k[3])),hh=Math.max(y(Math.min(k[0],k[3]))-t,2);
+    s+=`<line x1="${x}" x2="${x}" y1="${y(k[1])}" y2="${y(k[2])}" stroke="${col}" stroke-width="2" stroke-linecap="round"/><rect x="${x-bw/2}" y="${t}" width="${bw}" height="${hh}" rx="2" fill="${col}"/>`});
+  return s+"</svg>";
+}
+// 종가 흐름으로 캔들 만들기 (그림용)
+function path(closes,noise=.25){const out=[];let prev=closes[0];for(let i=1;i<closes.length;i++){const c=closes[i],o=prev,amp=Math.abs(c-o)*noise+.6;out.push([o,Math.max(o,c)+amp*((i*7)%5)/5+.3,Math.min(o,c)-amp*((i*3)%5)/5-.3,c]);prev=c}return out}
+const LESSONS={
+ candle:{t:"캔들 읽기",items:[
+  {h:"캔들 하나에 담긴 4개의 가격",p:"캔들은 정해진 기간(하루, 일주일) 동안의 <b>시가·고가·저가·종가</b>를 한 막대에 그린 것이에요. 굵은 부분이 <b>몸통</b>(시가~종가), 가는 선이 <b>꼬리</b>(그 기간의 최고·최저)예요.",
+   fig:()=>`<div class="figs"><div>${mini([[10,16,8,15]],{w:120,h:120})}<b class="up">양봉</b>종가가 시가보다 높음<br>(한국은 빨강)</div><div>${mini([[15,17,9,10]],{w:120,h:120})}<b class="dn">음봉</b>종가가 시가보다 낮음<br>(한국은 파랑)</div></div>`,
+   tip:"미국 앱은 색이 반대예요(상승 초록, 하락 빨강). 이 게임은 한국식이에요."},
+  {h:"자주 보는 캔들 모양",p:"몸통과 꼬리의 길이로 그날 사려는 힘과 팔려는 힘 중 어느 쪽이 셌는지 짐작해요.",
+   fig:()=>`<div class="figs">
+     <div>${mini([[10,21,9.5,20.5]],{w:110,h:110})}<b>장대양봉</b>하루 종일 강하게 오름</div>
+     <div>${mini([[20,20.5,9.5,10]],{w:110,h:110})}<b>장대음봉</b>하루 종일 강하게 내림</div>
+     <div>${mini([[15,20,10,15.1]],{w:110,h:110})}<b>도지</b>시가≈종가. 힘이 팽팽함</div>
+     <div>${mini([[17,18,8,18]],{w:110,h:110})}<b>망치형</b>크게 밀렸다가 회복</div>
+     <div>${mini([[12,21,11.5,11]],{w:110,h:110})}<b>윗꼬리 긴 봉</b>올랐다가 되밀림</div></div>`,
+   tip:"캔들 하나만으로 다음 날을 맞히기는 어려워요. 앞뒤 흐름과 함께 봐야 의미가 생겨요."},
+  {h:"갭(빈 공간)",p:"오늘 시가가 어제 종가와 크게 다르면 캔들 사이에 빈 공간이 생겨요. 밤사이 뉴스나 공시가 있었다는 신호예요.",
+   fig:()=>`<div class="fig">${mini([[10,11,9.5,10.8],[10.8,11.5,10.2,11.2],[11.2,11.6,10.9,11.4],[15,16.5,14.6,16],[16,16.8,15.2,15.6],[15.6,16.2,15,15.9]],{mark:[2.6,3.4]})}</div>`,
+   tip:"빈칸 문제에서 빈칸 오른쪽 첫 캔들이 빈칸 끝과 크게 벌어져 시작하면, 그 사이에 갭이 있었던 거예요. 보기 마지막 캔들과 이어지는지 확인해 보세요."}]},
+ trend:{t:"추세와 흐름",items:[
+  {h:"상승·하락·횡보",p:"고점과 저점이 함께 높아지면 <b>상승 추세</b>, 함께 낮아지면 <b>하락 추세</b>, 일정 범위에서 오르내리면 <b>횡보(박스권)</b>예요.",
+   fig:()=>`<div class="figs"><div>${mini(path([10,13,11.5,15,13.5,17,15.5,19]),{w:140,h:100})}<b class="up">상승</b>고점·저점이 높아짐</div><div>${mini(path([19,16,17.5,14,15.5,12,13.5,10]),{w:140,h:100})}<b class="dn">하락</b>고점·저점이 낮아짐</div><div>${mini(path([14,17,13,16.5,13.5,17,13,16]),{w:140,h:100})}<b>횡보</b>범위 안에서 오르내림</div></div>`},
+  {h:"지지선과 저항선",p:"여러 번 멈춘 가격대를 이어 보면 선이 보여요. 아래에서 받쳐 준 곳이 <b>지지선</b>, 위에서 막힌 곳이 <b>저항선</b>이에요. 이 선을 뚫으면 <b>돌파</b>라고 해요.",
+   fig:()=>`<div class="fig">${mini(path([12,16,12.5,15.8,12.3,16,13,16.2,19,21]),{lines:[{v:16.4,t:"저항",c:"var(--down)"},{v:11.8,t:"지지",c:"var(--up)"}],mark:[7.5,9]})}</div>`},
+  {h:"자주 나오는 흐름 모양",p:"차트에는 이름 붙은 모양들이 있어요. 빈칸이 이런 모양의 한가운데에 걸리면 앞뒤를 보고 짐작할 수 있어요.",
+   fig:()=>`<div class="figs">
+    <div>${mini(path([18,15,12,10,12.5,15,17.5]),{w:140,h:100})}<b>V자 반등</b>급락 후 빠른 회복</div>
+    <div>${mini(path([18,13,16,13.2,17,20]),{w:140,h:100})}<b>쌍바닥</b>같은 바닥을 두 번 확인</div>
+    <div>${mini(path([10,14,12,17,12.5,14.5,10]),{w:140,h:100})}<b>머리어깨형</b>세 번째 고점에서 꺾임</div>
+    <div>${mini(path([10,10.3,10.1,10.4,10.2,13,15.5,14.8]),{w:140,h:100})}<b>박스 돌파</b>잠잠하다 터짐</div>
+    <div>${mini(path([10,15,19,17,16,16.5,15.5]),{w:140,h:100})}<b>급등 후 되돌림</b>오른 만큼 일부 반납</div></div>`}]},
+ data:{t:"데이터로 본 경향성",items:[
+  {h:"추세는 생각보다 잘 안 이어져요",p:"한국 주식 약 1,500종목의 실제 일봉을 보면, 지난 20일 오른 종목이 다음 10일도 오른 비율은 <b>약 49%</b>였어요. 강하게 오른 경우만 골라도 비슷했어요. 사실상 동전 던지기예요.",
+   fig:()=>`<div class="fig" style="text-align:center;padding:16px"><div class="stat-big">49%</div><div class="xs muted">직전 20일과 다음 10일의 방향이 같았던 비율</div></div>`,
+   tip:"빈칸 문제에서 '앞에서 올랐으니 빈칸도 계속 올랐겠지'는 좋은 단서가 아니에요. 대신 빈칸 <b>양 끝의 높이</b>(모든 보기가 같은 곳에서 출발하고 같은 곳에서 끝나요)와 아래 경향성을 보세요."},
+  {h:"변동성은 이어져요 (가장 쓸모 있는 단서)",p:"잠잠하던 종목은 계속 잠잠하고, 요동치던 종목은 계속 요동치는 경향이 뚜렷해요. 직전 20일 움직임이 작은 종목은 다음 10일 움직임이 보통의 <b>0.6배</b>, 큰 종목은 <b>1.6배</b>였어요.",
+   fig:()=>`<div class="figs"><div style="padding:14px 8px"><div class="stat-big dn">0.6×</div>잠잠했던 종목의<br>다음 움직임</div><div style="padding:14px 8px"><div class="stat-big up">1.6×</div>요동쳤던 종목의<br>다음 움직임</div></div>`,
+   tip:"양옆 캔들이 짧고 얌전한데 보기 하나만 크게 출렁인다면 오답일 가능성이 높아요. 반대로 양옆이 거칠면 빈칸도 거칠었을 거예요."},
+  {h:"하루 급등 뒤엔 살짝 되돌리는 편",p:"평소보다 3배 넘게 크게 오른 날 다음 5일은 평균 <b>-0.4%</b>였고, 더 오른 경우는 <b>42%</b>에 그쳤어요. 크게 내린 날 뒤에는 뚜렷한 방향이 없었어요.",
+   fig:()=>`<div class="fig">${mini(path([10,10.4,10.2,14.5,13.8,13.2,13.6,13]),{mark:[2.5,3.5]})}</div>`},
+  {h:"거래량이 터지면 변동성도 커져요",p:"평소보다 거래량이 크게 늘어난 날 이후에는 가격 움직임도 평소보다 <b>약 15%</b> 컸어요. 거래량 막대가 높이 솟은 곳 근처는 캔들도 길어지기 쉬워요.",
+   tip:"쉬움·보통 난이도에서는 거래량이 보여요. 빈칸 바로 옆 거래량이 크면 빈칸 안도 크게 움직였을 가능성을 생각해 보세요."},
+  {h:"빈칸 문제 푸는 순서",p:"① 빈칸 양 끝의 높이 차이를 본다 → ② 양옆 캔들의 크기(변동성)를 본다 → ③ 보기 중 캔들 크기가 양옆과 어울리지 않는 것을 지운다 → ④ 오른쪽 첫 캔들의 갭이나 거래량으로 빈칸 끝부분의 움직임을 짐작한다.",
+   tip:"이 수치들은 과거 데이터에서 나온 경향일 뿐 미래를 보장하지 않아요. 투자 판단의 근거로 쓰지 마세요."}]}
+};
+let studyTab="candle";
+function study(tab){
+  if(tab)studyTab=tab;S=null;clearInterval(timer);app.classList.remove('fit');
+  const L2=LESSONS[studyTab];
+  app.innerHTML=`<div class="row" style="margin:6px 0 4px"><button class="muted" style="font-size:22px;padding:4px 6px 4px 0" onclick="home()" aria-label="뒤로">←</button><b style="font-size:20px">차트 공부하기</b></div>
+  <div class="tabs">${Object.entries(LESSONS).map(([k,v])=>`<button class="${k==studyTab?"on":""}" onclick="study('${k}')">${v.t}</button>`).join("")}</div>
+  ${L2.items.map(it=>`<div class="card lesson"><h3>${it.h}</h3><p>${it.p}</p>${it.fig?it.fig():""}${it.tip?`<div class="tip">💡 ${it.tip}</div>`:""}</div>`).join("")}
+  <button class="cta" style="margin-top:4px" onclick="home()">문제 풀러 가기</button>`;
+  window.scrollTo(0,0);
 }
 function copyRes(m,n){const t=`빈칸 차트 ${L[cfg.diff]}\n${m}\n${n}/10 · ${S.score}점`;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>$("#note").textContent="복사했어요.",()=>$("#note").textContent="복사하지 못했어요.")}
 addEventListener("keydown",e=>{if(!S||!S.q||e.metaKey||e.ctrlKey)return;if(S.done){if(e.key=="Enter")advance();return}
