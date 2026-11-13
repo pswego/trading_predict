@@ -1,0 +1,46 @@
+[project]
+name = "chartgame"
+version = "0.1.0"
+description = "차트 빈칸 퍼즐 게임 — 파이프라인과 API"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "pyarrow>=17",
+    "requests>=2.32",
+    "finance-datareader>=0.9.90",
+    "scikit-learn>=1.5",
+    "matplotlib>=3.9",
+    "typer>=0.12",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "itsdangerous>=2.2",
+    "apscheduler>=3.10",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "hypothesis>=6", "httpx>=0.27", "ruff>=0.6"]
+
+[project.scripts]
+chartgame = "chartgame.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["chartgame"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: 실제 데이터가 필요한 느린 테스트"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501", "B008", "E741", "E731"]

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="EUC-KR" ?>
+<protocol>
+	<chartdata symbol="222520" name="sample" count="5" timeframe="day" precision="0" origintime="19900103">
+				<item data="20161128|13500|13500|13500|13500|10" />
+				<item data="20161129|13400|13600|13300|13550|2500" />
+				<item data="20161130|0|0|0|13550|0" />
+				<item data="20161201|13550|13900|13500|13800|4100" />
+				<item data="20161201|13550|13950|13500|13850|4200" />
+	</chartdata>
+</protocol>

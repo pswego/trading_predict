@@ -1,0 +1,12 @@
+data/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+web/dist/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+test-results/
+playwright-report/
+*.egg-info/
