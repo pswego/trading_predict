@@ -456,7 +456,7 @@ function needNick(){if(cleanNick(nick).length<2){const m=$("#bmsg");if(m)m.textC
 async function battleCreate(){if(needNick())return;const code=Array.from({length:4},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.random()*32|0]).join("");await battleEnter(code,true)}
 async function battleJoin(raw){if(needNick())return;const code=String(raw||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,4);if(code.length!=4){$("#bmsg").textContent="4자리 코드를 입력해 주세요.";return}await battleEnter(code,false)}
 async function battleEnter(code,host){
-  try{const mr=await B.room.join("cg-"+code.toLowerCase());Object.assign(B,{mroom:mr,code,host,round:0,game:null,status:"lobby",ready:host,started:0});
+  try{const mr=await B.room.join("cg-"+code.toLowerCase());Object.assign(B,{mroom:mr,code,host,round:0,game:null,status:"lobby",ready:host,started:0,sawHost:false,hostGone:false});
     B.unsub.push(mr.onPeers(ch=>{B.peers=ch.peers;onBattlePeers()}));
     await mr.presence({nick:cleanNick(nick),role:host?"host":"guest",ready:host,status:"lobby",round:0,prog:0,score:0,res:""});
     if(host){B.game={round:0,cfg:{...cfg},seed:0};await mr.presence({game:B.game});lobbyAdvert()}
@@ -471,7 +471,8 @@ function onBattlePeers(){
   const g=hostGame();
   if(!B.host&&g&&Number(g.round)>B.round&&Number(g.seed)){ // 방장이 새 라운드를 시작했다
     B.round=Number(g.round);B.game=g;battleStartLocal();return}
-  if(!B.host&&!players().some(p=>p.host)&&B.view=="room"){B.hostGone=true}
+  // 방장을 한 번 본 뒤에 사라졌을 때만 '나갔다'고 본다 (막 들어온 순간에는 방장 정보가 아직 안 왔을 수 있다)
+  if(!B.host){const hostHere=players().some(p=>p.host);if(hostHere){B.sawHost=true;B.hostGone=false}else if(B.sawHost&&B.view=="room"){B.hostGone=true}}
   if(B.host)lobbyAdvert();
   if(B.view=="room")battleRoom();else if(B.view=="result")battleResultView();else if(S&&S.battle){const el=$("#bstrip");if(el)el.outerHTML=battleStrip()}
 }
@@ -518,7 +519,7 @@ function battleResultView(){
   ${B.mine?`<button class="ghost" onclick="result()">내 문제별 결과 보기</button>`:""}<button class="ghost" onclick="battleLeave();battleLobby()">방 나가기</button></div>`;
 }
 function battleRematch(){B.mroom.presence({status:"lobby",ready:true}).catch(()=>{});battleStart()}
-function battleLeave(){B.status="left";if(B.host)lobbyAdvert();const mr=B.mroom;Object.assign(B,{mroom:null,code:null,host:false,round:0,game:null,peers:[],view:null,mine:null,hostGone:false});if(mr)mr.leave().catch(()=>{})}
+function battleLeave(){B.status="left";if(B.host)lobbyAdvert();const mr=B.mroom;Object.assign(B,{mroom:null,code:null,host:false,round:0,game:null,peers:[],view:null,mine:null,hostGone:false,sawHost:false});if(mr)mr.leave().catch(()=>{})}
 
 /* ---------- 공부하기 ---------- */
 // 그림용 캔들: [시가, 고가, 저가, 종가]
