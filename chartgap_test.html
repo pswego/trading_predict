@@ -87,8 +87,11 @@ svg{display:block;width:100%;height:auto}
 .figs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:12px}
 .figs>div{background:var(--panel2);border-radius:14px;padding:8px 8px 10px;text-align:center;font-size:13px}
 .figs b{display:block;margin-top:4px;font-size:14px}
+.pat{display:grid;gap:8px;margin-top:10px}.pat>div{background:var(--panel2);border-radius:12px;padding:10px 12px;font-size:13.5px;line-height:1.55}.pat b{display:block;margin-bottom:3px;font-size:13px}
 .stat-big{font-size:30px;font-weight:900;letter-spacing:-1px}
 /* 결과 */
+.nextbar{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 30%)}
+.nextbar>div{max-width:688px;margin:0 auto}
 .accbar{position:relative;height:10px;border-radius:9px;background:var(--panel2);margin-top:10px}
 .accbar i{display:block;height:100%;border-radius:9px}.accbar span{position:absolute;top:-4px;width:2px;height:18px;background:var(--ink);opacity:.6}
 .score{font-size:64px;font-weight:900;letter-spacing:-2px;line-height:1}
@@ -104,8 +107,8 @@ const $=s=>document.querySelector(s), app=$("#app");
 const L={easy:"쉬움",normal:"보통",hard:"어려움",KOSPI:"코스피",KOSDAQ:"코스닥",large:"대형주",mid:"중형주",small:"소형주",micro:"초소형주",day:"일봉",week:"주봉"};
 const SRC={mirror:"실제 모양을 뒤집은 것",other_stock:"다른 종목의 구간",other_stock_volatility_mismatch:"변동성이 다른 종목",same_market_cap_tier:"비슷한 규모 종목의 구간",same_stock_other_period:"같은 종목의 다른 시기",same_sector:"같은 업종 종목의 구간"};
 const LIM={choice4:{easy:30,normal:25,hard:25},ox:{easy:15,normal:12,hard:12},draw:{easy:45,normal:40,hard:40}}, MUL={easy:1,normal:1.5,hard:2.5};
-// 그리기 모드: 이 일치도(%) 미만이면 0점. 양 끝을 직선으로 이었을 때 보통 33~43%가 나온다
-const DRAW_PASS={easy:55,normal:50,hard:45}, DRAW_MAX=300;
+// 그리기 모드: 이 일치도(%) 미만이면 0점. 직선으로만 이어도 66~72%, 대충 맞게 그리면 88~94%
+const DRAW_PASS={easy:40,normal:45,hard:50}, DRAW_MAX=300;
 const ZOOM={main:14,thumb:3}; // 빈칸 양옆으로 보여 줄 봉 수 (확대)
 let cfg=Object.assign({type:"choice4",diff:"easy",iv:"day"},JSON.parse(localStorage.getItem("cg_cfg")||"{}")), S=null, timer=null;
 const seen=new Set(JSON.parse(localStorage.getItem("cg_seen")||"[]"));
@@ -155,13 +158,13 @@ function drawnPoints(raw,g,endV){
   const pts=raw.filter(([tt])=>tt>-1&&tt<g-1).sort((a,b)=>a[0]-b[0]);
   return [[-1,1],...pts,[g-1,endV]];
 }
-/* 일치도: 캔들마다 그린 선의 값과 실제 종가의 차이를 평균 내서, 빈칸 안 움직임 폭의 절반으로 나눈다 */
+/* 일치도: 캔들마다 그린 선의 값과 실제 종가의 차이를 평균 내서, 빈칸 안 움직임 폭으로 나눈다 */
 function drawScore(raw,real){
   const g=real.length,pts=drawnPoints(raw,g,real[g-1][3]);
   const at=tt=>{for(let i=1;i<pts.length;i++)if(pts[i][0]>=tt){const [a,va]=pts[i-1],[b,vb]=pts[i];return b==a?vb:va+(vb-va)*(tt-a)/(b-a)}return pts[pts.length-1][1]};
   const closes=real.map(k=>k[3]),all=[1,...closes],scale=Math.max(Math.max(...all)-Math.min(...all),.03);
   let err=0;for(let j=0;j<g-1;j++)err+=Math.abs(at(j)-closes[j]);err/=Math.max(g-1,1);
-  return Math.round(100*Math.max(0,1-2*err/scale));
+  return Math.round(100*Math.max(0,1-err/scale));
 }
 function drawCoverage(raw,g){if(raw.length<2)return 0;const ts=raw.map(r=>r[0]);return (Math.min(Math.max(...ts),g-1)-Math.max(Math.min(...ts),-1))/g}
 function bindDraw(){
@@ -194,7 +197,7 @@ function home(){
     <div class="row xs muted" style="margin-top:16px"><span>이 조건 남은 문제</span><span class="sp"></span><b class="tnum" style="color:var(--ink)">${left}</b>&nbsp;/ ${pool.length}</div>
   </div>
   <div style="margin-top:16px"><button class="cta" onclick="start()">10문제 시작</button></div>
-  <button class="card study-entry" onclick="study()"><span class="ic">📘</span><span class="sp" style="text-align:left"><b>차트 공부하기</b><br><span class="xs muted">캔들 읽는 법 · 추세와 흐름 · 실제 데이터로 본 경향성</span></span><span class="muted">›</span></button>
+  <button class="card study-entry" onclick="study()"><span class="ic">📘</span><span class="sp" style="text-align:left"><b>차트 공부하기</b><br><span class="xs muted">캔들 · 추세 · 패턴 사전 18종 · 캔들 조합 8종 · 데이터 경향성</span></span><span class="muted">›</span></button>
   <p class="xs muted" style="text-align:center;margin-top:22px;line-height:1.7">테스트판 · 실제 문제 ${Q.length}개 수록<br>과거 데이터 기반 오락용이며 투자 권유가 아닙니다 · 가격 출처: 네이버 금융<br>
   <button class="xs muted" style="text-decoration:underline" onclick="seen.clear();save();home()">푼 문제 기록 지우기</button></p>`;
 }
@@ -257,7 +260,7 @@ function render(){
       <button style="color:var(--good);border-color:var(--good)" onclick="answer('O')" aria-label="O, 실제다">O</button>
       <button style="color:var(--bad);border-color:var(--bad)" onclick="answer('X')" aria-label="X, 가짜다">X</button></div>`;
   }
-  if(S.done)h+=`<div style="margin-top:16px"><button class="cta" onclick="advance()">${S.i==9?"결과 보기":"다음 문제"}</button></div>`;
+  if(S.done)h+=`<div class="nextbar"><div><button class="cta" onclick="advance()">${S.i==9?"결과 보기":"다음 문제"} →</button></div></div>`;
   app.innerHTML=h;app.classList.toggle('fit',fit);if(draw&&!S.done)bindDraw();
 }
 function pick(i){if(S.sel===i)answer(i);else{S.sel=i;render()}}
@@ -298,7 +301,12 @@ function mini(cs,{w=280,h=120,mark=null,lines=[],label=null}={}){
   return s+"</svg>";
 }
 // 종가 흐름으로 캔들 만들기 (그림용)
-function path(closes,noise=.25){const out=[];let prev=closes[0];for(let i=1;i<closes.length;i++){const c=closes[i],o=prev,amp=Math.abs(c-o)*noise+.6;out.push([o,Math.max(o,c)+amp*((i*7)%5)/5+.3,Math.min(o,c)-amp*((i*3)%5)/5-.3,c]);prev=c}return out}
+function path(closes){ // 종가 흐름 → 그림용 캔들. 구간마다 2개로 나누고, 움직임이 작아도 몸통이 보이게 한다
+  const span=Math.max(...closes)-Math.min(...closes)||1,pts=[closes[0]];
+  for(let i=1;i<closes.length;i++){const a=closes[i-1],b=closes[i];pts.push(a+(b-a)*.55+(i%2?.06:-.06)*span,b)}
+  const out=[];for(let i=1;i<pts.length;i++){let o=pts[i-1],c=pts[i];if(Math.abs(c-o)<.035*span)c=o+(i%2?.035:-.035)*span;
+    const w=.05*span;out.push([o,Math.max(o,c)+w*(.4+((i*7)%5)/6),Math.min(o,c)-w*(.4+((i*3)%5)/6),c])}
+  return out}
 const LESSONS={
  candle:{t:"캔들 읽기",items:[
   {h:"캔들 하나에 담긴 4개의 가격",p:"캔들은 정해진 기간(하루, 일주일) 동안의 <b>시가·고가·저가·종가</b>를 한 막대에 그린 것이에요. 굵은 부분이 <b>몸통</b>(시가~종가), 가는 선이 <b>꼬리</b>(그 기간의 최고·최저)예요.",
@@ -320,13 +328,43 @@ const LESSONS={
    fig:()=>`<div class="figs"><div>${mini(path([10,13,11.5,15,13.5,17,15.5,19]),{w:140,h:100})}<b class="up">상승</b>고점·저점이 높아짐</div><div>${mini(path([19,16,17.5,14,15.5,12,13.5,10]),{w:140,h:100})}<b class="dn">하락</b>고점·저점이 낮아짐</div><div>${mini(path([14,17,13,16.5,13.5,17,13,16]),{w:140,h:100})}<b>횡보</b>범위 안에서 오르내림</div></div>`},
   {h:"지지선과 저항선",p:"여러 번 멈춘 가격대를 이어 보면 선이 보여요. 아래에서 받쳐 준 곳이 <b>지지선</b>, 위에서 막힌 곳이 <b>저항선</b>이에요. 이 선을 뚫으면 <b>돌파</b>라고 해요.",
    fig:()=>`<div class="fig">${mini(path([12,16,12.5,15.8,12.3,16,13,16.2,19,21]),{lines:[{v:16.4,t:"저항",c:"var(--down)"},{v:11.8,t:"지지",c:"var(--up)"}],mark:[7.5,9]})}</div>`},
-  {h:"자주 나오는 흐름 모양",p:"차트에는 이름 붙은 모양들이 있어요. 빈칸이 이런 모양의 한가운데에 걸리면 앞뒤를 보고 짐작할 수 있어요.",
+  {h:"자주 나오는 흐름 모양",p:"차트에는 이름 붙은 모양들이 있어요. 빈칸이 이런 모양의 한가운데에 걸리면 앞뒤를 보고 짐작할 수 있어요. 더 많은 모양과 '그 뒤 어떻게 되는지'는 <b>패턴 사전</b> 탭에 있어요.",
    fig:()=>`<div class="figs">
     <div>${mini(path([18,15,12,10,12.5,15,17.5]),{w:140,h:100})}<b>V자 반등</b>급락 후 빠른 회복</div>
     <div>${mini(path([18,13,16,13.2,17,20]),{w:140,h:100})}<b>쌍바닥</b>같은 바닥을 두 번 확인</div>
     <div>${mini(path([10,14,12,17,12.5,14.5,10]),{w:140,h:100})}<b>머리어깨형</b>세 번째 고점에서 꺾임</div>
     <div>${mini(path([10,10.3,10.1,10.4,10.2,13,15.5,14.8]),{w:140,h:100})}<b>박스 돌파</b>잠잠하다 터짐</div>
     <div>${mini(path([10,15,19,17,16,16.5,15.5]),{w:140,h:100})}<b>급등 후 되돌림</b>오른 만큼 일부 반납</div></div>`}]},
+ pattern:{t:"패턴 사전",items:[
+  {h:"이 탭 보는 법",p:"차트 분석에서 자주 쓰는 모양을 <b>① 어떤 모양인지 → ② 그 뒤 흔히 어떻게 된다고 알려져 있는지 → ③ 빈칸 문제에서는 어떻게 추측하면 되는지</b> 순서로 정리했어요.",tip:"②는 기술적 분석에서 흔히 하는 해석이에요. 우리가 직접 잰 데이터로는 '추세가 그대로 이어질 확률'이 49%로 동전 던지기 수준이었어요. 그래서 빈칸 문제에서는 모양보다 <b>양 끝 높이와 캔들 크기</b>를 먼저 보는 게 더 확실해요."},
+  {h:"상승 깃발",p:"급하게 오른 뒤 살짝 아래로 기울어진 좁은 박스에서 쉬어 가요.",fig:()=>`<div class="fig">${mini(path([10, 13, 16, 19, 18.3, 18.8, 18, 18.5, 17.8, 20, 22]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>쉬는 구간이 끝나면 원래 방향(위)으로 다시 오르는 경우가 많다고 알려져 있어요.</div><div><b>🎯 빈칸에서는</b>빈칸 왼쪽이 급등, 오른쪽이 더 높은 곳에서 시작하면 → 빈칸은 '좁게 옆으로 쉬다가 끝에서 오르는' 모양을 고르세요.</div></div>`},
+  {h:"하락 깃발",p:"급락한 뒤 살짝 위로 기울어진 좁은 박스에서 반등하는 듯 쉬어 가요.",fig:()=>`<div class="fig">${mini(path([22, 19, 16, 13, 13.7, 13.2, 14, 13.5, 14.2, 12, 10]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>쉬는 구간이 끝나면 다시 아래로 이어지는 경우가 많아요.</div><div><b>🎯 빈칸에서는</b>왼쪽 급락, 오른쪽이 더 낮은 곳에서 시작 → '작게 반등하다가 끝에서 떨어지는' 모양.</div></div>`},
+  {h:"쌍바닥 (W자)",p:"비슷한 바닥을 두 번 찍고 그 사이 고점(목선)을 넘어요.",fig:()=>`<div class="fig">${mini(path([20, 16, 12, 15, 17, 15, 12.2, 15, 18, 21]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>두 번째 바닥에서 지지가 확인되면 목선 돌파 후 상승으로 바뀌는 신호로 봐요.</div><div><b>🎯 빈칸에서는</b>왼쪽에 바닥 하나, 오른쪽이 높게 끝나면 → 빈칸에 '두 번째 바닥'이 숨어 있을 가능성. 한 번 내려갔다 올라오는 보기를 고르세요.</div></div>`},
+  {h:"쌍봉 (M자)",p:"비슷한 고점을 두 번 찍고 그 사이 저점을 깨요.",fig:()=>`<div class="fig">${mini(path([10, 14, 18, 15, 13, 15, 17.8, 15, 12, 9]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>두 번째 고점에서 막히면 하락으로 바뀌는 신호로 봐요.</div><div><b>🎯 빈칸에서는</b>왼쪽에 고점 하나, 오른쪽이 낮게 끝나면 → 빈칸은 '한 번 더 올라갔다가 꺾이는' 모양.</div></div>`},
+  {h:"머리어깨형",p:"왼쪽 어깨 - 더 높은 머리 - 낮은 오른쪽 어깨, 세 개의 봉우리.",fig:()=>`<div class="fig">${mini(path([10, 14, 12, 18, 12.5, 14.5, 11.5, 9]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>오른쪽 어깨 뒤 목선을 깨면 하락 추세로 바뀌는 대표 모양이에요.</div><div><b>🎯 빈칸에서는</b>빈칸 앞이 '높은 머리'였다면 → 빈칸은 머리보다 낮은 작은 반등(오른쪽 어깨) 후 하락.</div></div>`},
+  {h:"역머리어깨형",p:"머리어깨형을 뒤집은 모양. 가장 깊은 바닥이 가운데에 있어요.",fig:()=>`<div class="fig">${mini(path([18, 14, 16, 10, 15.5, 13.5, 16.5, 19]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>목선을 넘으면 상승 추세로 바뀌는 신호로 봐요.</div><div><b>🎯 빈칸에서는</b>가장 깊은 바닥 뒤에 빈칸 → 덜 깊은 바닥(오른쪽 어깨)을 찍고 올라가는 보기.</div></div>`},
+  {h:"상승 삼각형",p:"고점은 같은 높이(저항)인데 저점이 점점 높아져요.",fig:()=>`<div class="fig">${mini(path([10, 15, 12, 15, 13, 15, 14, 15, 14.6, 18]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>저항선을 위로 뚫는 경우가 많다고 알려져 있어요.</div><div><b>🎯 빈칸에서는</b>폭이 점점 좁아지다 빈칸 → 빈칸 끝 무렵 위로 튀어 나가는 모양.</div></div>`},
+  {h:"하락 삼각형",p:"저점은 같은 높이(지지)인데 고점이 점점 낮아져요.",fig:()=>`<div class="fig">${mini(path([18, 13, 16, 13, 15, 13, 14, 13, 13.4, 10]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>지지선을 아래로 깨는 경우가 많아요.</div><div><b>🎯 빈칸에서는</b>저점이 계속 같은 곳에서 받쳐지다 빈칸 → 끝에서 아래로 깨지는 모양.</div></div>`},
+  {h:"대칭 삼각형 (수렴)",p:"고점은 낮아지고 저점은 높아지며 폭이 좁아져요.",fig:()=>`<div class="fig">${mini(path([14, 19, 10, 17.5, 11.5, 16, 12.8, 15, 13.6, 14.3]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>에너지가 모이는 구간이라 방향은 몰라도 곧 크게 움직이는 경향이 있어요.</div><div><b>🎯 빈칸에서는</b>양옆 캔들이 점점 작아지면 → 빈칸도 작고 얌전한 보기. 오른쪽이 갑자기 크게 움직이면 빈칸 끝에서 터진 것.</div></div>`},
+  {h:"박스권 돌파",p:"일정 범위에서 오르내리다 위(또는 아래)로 벗어나요.",fig:()=>`<div class="fig">${mini(path([12, 15, 12.3, 15, 12.2, 14.8, 12.5, 15, 17.5, 19]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>돌파 뒤에는 그 방향으로 한동안 이어지거나, 박스 끝까지 되돌아와 확인하는 경우가 많아요.</div><div><b>🎯 빈칸에서는</b>왼쪽이 박스, 오른쪽이 박스 위에서 시작하면 → 빈칸 안에서 돌파가 일어난 거예요. 박스를 유지하다 뚫는 보기를 고르세요.</div></div>`},
+  {h:"컵 앤 핸들",p:"둥근 바닥(컵) 뒤에 작은 눌림(손잡이)이 와요.",fig:()=>`<div class="fig">${mini(path([18, 15, 13, 12, 13, 15, 18, 17, 16.5, 17.2, 20]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>손잡이 뒤 이전 고점을 넘으면 상승이 이어진다고 봐요.</div><div><b>🎯 빈칸에서는</b>둥근 바닥이 끝난 뒤 빈칸 → 살짝 눌렸다가 다시 오르는 모양.</div></div>`},
+  {h:"V자 반등",p:"급하게 떨어진 만큼 급하게 회복해요.",fig:()=>`<div class="fig">${mini(path([20, 17, 14, 11, 9, 12, 15, 18, 20]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>극단적인 공포 뒤에 자주 나와요. 회복 속도가 하락 속도와 비슷한 경우가 많아요.</div><div><b>🎯 빈칸에서는</b>왼쪽 급락, 오른쪽이 원래 높이 근처 → 빈칸 안에 '바닥 찍고 급반등'이 있어요. 양 끝이 비슷한 높이여도 직선 보기를 고르지 마세요.</div></div>`},
+  {h:"급등 후 되돌림",p:"하루 이틀 크게 오른 뒤 일부를 반납해요.",fig:()=>`<div class="fig">${mini(path([10, 11, 16, 20, 18.5, 17, 17.8, 16.8, 17.3]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>실제 데이터에서도 크게 오른 날 다음 5일은 평균 -0.4%, 더 오른 경우는 42%였어요.</div><div><b>🎯 빈칸에서는</b>빈칸 앞에 장대양봉이 있으면 → 빈칸은 '조금 내려오며 옆으로 기는' 모양일 가능성이 커요.</div></div>`},
+  {h:"하락 쐐기",p:"고점과 저점이 모두 낮아지지만 폭은 좁아지며 하락 힘이 약해져요.",fig:()=>`<div class="fig">${mini(path([20, 17, 18.5, 15.5, 16.8, 14.5, 15.6, 14, 15, 17]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>끝에서 위로 반전되는 경우가 많다고 알려져 있어요.</div><div><b>🎯 빈칸에서는</b>내려가는 폭이 줄어드는 중 빈칸 → 끝에서 위로 꺾이는 모양.</div></div>`},
+  {h:"상승 쐐기",p:"고점과 저점이 모두 높아지지만 폭이 좁아지며 상승 힘이 약해져요.",fig:()=>`<div class="fig">${mini(path([10, 13, 11.5, 14.5, 13.2, 15.5, 14.4, 16, 15, 12.5]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>끝에서 아래로 반전되는 경우가 많아요.</div><div><b>🎯 빈칸에서는</b>오르는 폭이 줄어드는 중 빈칸 → 끝에서 아래로 꺾이는 모양.</div></div>`},
+  {h:"둥근 바닥",p:"천천히 내려와 천천히 올라가는 그릇 모양이에요.",fig:()=>`<div class="fig">${mini(path([20, 17, 15, 13.8, 13.2, 13, 13.3, 14, 15.5, 17.5]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>바닥 근처에서 오래 머문 뒤 서서히 상승으로 바뀌어요.</div><div><b>🎯 빈칸에서는</b>빈칸이 바닥 근처라면 → 크게 출렁이지 않고 완만하게 휘는 보기를 고르세요.</div></div>`},
+  {h:"계단식 상승",p:"오르고 쉬고, 오르고 쉬기를 반복해요.",fig:()=>`<div class="fig">${mini(path([10, 13, 13.2, 12.8, 13.1, 16, 16.2, 15.8, 16.1, 19]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>같은 리듬이 몇 번 이어지는 경향이 있어요.</div><div><b>🎯 빈칸에서는</b>양옆에 계단 리듬이 보이면 → 빈칸도 '한 번 오르고 쉬는' 계단 한 칸.</div></div>`},
+  {h:"거래량 급증 + 장대봉",p:"평소 몇 배의 거래량과 함께 큰 캔들이 나와요.",fig:()=>`<div class="fig">${mini(path([12, 12.2, 12.1, 15, 15.6, 14.4, 16, 14.8, 15.5]),{h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>실제 데이터에서 거래량이 터진 뒤 가격 움직임은 평소보다 약 15% 컸어요. 이후 며칠 출렁임이 커져요.</div><div><b>🎯 빈칸에서는</b>빈칸 바로 앞에 거래량 폭증이 있으면 → 빈칸은 캔들이 크고 위아래로 흔들리는 보기.</div></div>`}]},
+ combo:{t:"캔들 조합",items:[
+  {h:"적삼병",p:"양봉 세 개가 연달아 계단처럼 올라요.",fig:()=>`<div class="fig" style="max-width:240px">${mini([[10, 11.3, 9.8, 11], [11, 12.3, 10.8, 12], [12, 13.4, 11.8, 13.2]],{w:200,h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>상승 힘이 강하다는 신호로 봐요. 다만 이미 많이 오른 뒤라면 과열일 수도 있어요.</div></div>`},
+  {h:"흑삼병",p:"음봉 세 개가 연달아 내려가요.",fig:()=>`<div class="fig" style="max-width:240px">${mini([[13.2, 13.4, 11.8, 12], [12, 12.2, 10.8, 11], [11, 11.2, 9.8, 10]],{w:200,h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>하락 힘이 강하다는 신호예요.</div></div>`},
+  {h:"상승 장악형",p:"작은 음봉을 다음 날 큰 양봉이 통째로 감싸요.",fig:()=>`<div class="fig" style="max-width:240px">${mini([[12, 12.2, 11, 11.2], [11, 13, 10.8, 12.8]],{w:200,h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>하락 끝자락에서 나오면 반등 신호로 봐요.</div></div>`},
+  {h:"하락 장악형",p:"작은 양봉을 다음 날 큰 음봉이 통째로 감싸요.",fig:()=>`<div class="fig" style="max-width:240px">${mini([[11.2, 12.2, 11, 12], [12.8, 13, 10.8, 11]],{w:200,h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>상승 끝자락에서 나오면 하락 신호로 봐요.</div></div>`},
+  {h:"샛별형",p:"큰 음봉 - 작은 봉 - 큰 양봉. 바닥에서 별이 뜬 모양.",fig:()=>`<div class="fig" style="max-width:240px">${mini([[14, 14.2, 11.5, 11.8], [11.3, 11.6, 10.8, 11.4], [11.8, 14, 11.6, 13.8]],{w:200,h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>바닥 반전 신호로 자주 언급돼요.</div></div>`},
+  {h:"석별형",p:"큰 양봉 - 작은 봉 - 큰 음봉. 꼭대기에서 별이 지는 모양.",fig:()=>`<div class="fig" style="max-width:240px">${mini([[11.8, 14.2, 11.6, 14], [14.4, 15, 14.2, 14.5], [14, 14.2, 11.6, 11.8]],{w:200,h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>천장 반전 신호로 자주 언급돼요.</div></div>`},
+  {h:"망치형 (바닥)",p:"하락 끝에서 아래꼬리가 긴 봉이 나와요.",fig:()=>`<div class="fig" style="max-width:240px">${mini([[14, 14.2, 12, 12.4], [12.4, 12.6, 11.6, 11.8], [11.6, 12, 9, 11.9]],{w:200,h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>장중에 크게 밀렸지만 사는 힘이 되돌려 놓았다는 뜻이에요. 반등 신호로 봐요.</div></div>`},
+  {h:"교수형 (천장)",p:"상승 끝에서 아래꼬리가 긴 봉이 나와요.",fig:()=>`<div class="fig" style="max-width:240px">${mini([[10, 11.8, 9.8, 11.6], [11.6, 12.6, 11.4, 12.4], [12.5, 12.8, 10, 12.6]],{w:200,h:110})}</div><div class="pat"><div><b>📈 이후 경향</b>모양은 망치형과 같지만 꼭대기에서 나오면 경고 신호로 봐요.</div></div>`},
+  {h:"캔들 조합을 빈칸에서 쓰는 법",p:"빈칸 바로 앞 2~3개 캔들이 위 조합 중 하나라면, 빈칸 첫 부분의 방향 힌트로 쓰세요. 예: 하락 끝에 망치형·샛별형 → 빈칸은 반등으로 시작하는 보기. 상승 끝에 석별형·교수형·하락 장악형 → 빈칸은 꺾이며 시작하는 보기.",tip:"캔들 조합은 신호가 약해서, 빈칸 오른쪽 끝 높이와 어긋나면 끝 높이를 믿으세요."}]},
  data:{t:"데이터로 본 경향성",items:[
   {h:"추세는 생각보다 잘 안 이어져요",p:"한국 주식 약 1,500종목의 실제 일봉을 보면, 지난 20일 오른 종목이 다음 10일도 오른 비율은 <b>약 49%</b>였어요. 강하게 오른 경우만 골라도 비슷했어요. 사실상 동전 던지기예요.",
    fig:()=>`<div class="fig" style="text-align:center;padding:16px"><div class="stat-big">49%</div><div class="xs muted">직전 20일과 다음 10일의 방향이 같았던 비율</div></div>`,
