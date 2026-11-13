@@ -89,6 +89,8 @@ svg{display:block;width:100%;height:auto}
 .figs b{display:block;margin-top:4px;font-size:14px}
 .stat-big{font-size:30px;font-weight:900;letter-spacing:-1px}
 /* 결과 */
+.accbar{position:relative;height:10px;border-radius:9px;background:var(--panel2);margin-top:10px}
+.accbar i{display:block;height:100%;border-radius:9px}.accbar span{position:absolute;top:-4px;width:2px;height:18px;background:var(--ink);opacity:.6}
 .score{font-size:64px;font-weight:900;letter-spacing:-2px;line-height:1}
 .list div.item{display:flex;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid var(--line)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -101,7 +103,9 @@ svg{display:block;width:100%;height:auto}
 const $=s=>document.querySelector(s), app=$("#app");
 const L={easy:"쉬움",normal:"보통",hard:"어려움",KOSPI:"코스피",KOSDAQ:"코스닥",large:"대형주",mid:"중형주",small:"소형주",micro:"초소형주",day:"일봉",week:"주봉"};
 const SRC={mirror:"실제 모양을 뒤집은 것",other_stock:"다른 종목의 구간",other_stock_volatility_mismatch:"변동성이 다른 종목",same_market_cap_tier:"비슷한 규모 종목의 구간",same_stock_other_period:"같은 종목의 다른 시기",same_sector:"같은 업종 종목의 구간"};
-const LIM={choice4:{easy:30,normal:25,hard:25},ox:{easy:15,normal:12,hard:12}}, MUL={easy:1,normal:1.5,hard:2.5};
+const LIM={choice4:{easy:30,normal:25,hard:25},ox:{easy:15,normal:12,hard:12},draw:{easy:45,normal:40,hard:40}}, MUL={easy:1,normal:1.5,hard:2.5};
+// 그리기 모드: 이 일치도(%) 미만이면 0점. 양 끝을 직선으로 이었을 때 보통 33~43%가 나온다
+const DRAW_PASS={easy:55,normal:50,hard:45}, DRAW_MAX=300;
 const ZOOM={main:14,thumb:3}; // 빈칸 양옆으로 보여 줄 봉 수 (확대)
 let cfg=Object.assign({type:"choice4",diff:"easy",iv:"day"},JSON.parse(localStorage.getItem("cg_cfg")||"{}")), S=null, timer=null;
 const seen=new Set(JSON.parse(localStorage.getItem("cg_seen")||"[]"));
@@ -120,6 +124,7 @@ function chart(p,fill,o={}){
   const pad=(hi-lo)*.08;lo-=pad;hi+=pad;
   const st=(W-pr-4)/(i1-i0),cx=i=>4+st*(i-i0+.5),y=v=>pb-(v-lo)/(hi-lo)*(pb-top),bw=Math.max(st*.62,1.5);
   const gx0=cx(l)-st/2,gx1=cx(l+g-1)+st/2;
+  if(o.geo)GEO={gx0,gx1,st,lo,hi,pb,top,G:g,W,H,end:p.options[0][g-1][3]};
   const cd=(k,x,op=1,extra="")=>{const u=k[3]>=k[0],col=u?"var(--up)":"var(--down)",t=y(Math.max(k[0],k[3])),h=Math.max(y(Math.min(k[0],k[3]))-t,1.2);
     return `<g opacity="${op}"${extra}><line x1="${x}" x2="${x}" y1="${y(k[1])}" y2="${y(k[2])}" stroke="${col}" stroke-width="${thumb?1.4:1.8}" stroke-linecap="round"/><rect x="${x-bw/2}" y="${t}" width="${bw}" height="${h}" rx="${bw>6?1.5:0}" fill="${col}"/></g>`};
   let s=`<svg viewBox="0 0 ${W} ${H}" font-family="Pretendard Variable,Pretendard,sans-serif" role="img" aria-label="${thumb?"보기 차트":"가운데가 가려진 차트"}">
@@ -128,6 +133,7 @@ function chart(p,fill,o={}){
     for(let pc=Math.ceil((lo-1)*100/step)*step;pc<=(hi-1)*100;pc+=step){const v=1+pc/100;
       s+=`<line x1="0" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${pc==0?'stroke-dasharray="5 5"':'opacity=".55"'}/><text x="${W-pr+6}" y="${y(v)+4}" font-size="${innerWidth<560?20:12}" font-weight="600" fill="var(--muted)">${pc>0?"+":""}${pc}%</text>`}}
   if(fill){const col=o.style=="real"?"var(--good)":"var(--accent)";s+=`<rect x="${gx0}" y="0" width="${gx1-gx0}" height="${H}" fill="${col}" opacity="${thumb?0.06:0.09}" rx="8"/>`}
+  else if(o.draw)s+=`<rect x="${gx0}" y="2" width="${gx1-gx0}" height="${H-4}" fill="var(--accent)" opacity=".07" rx="10"/>`;
   else s+=`<rect x="${gx0}" y="2" width="${gx1-gx0}" height="${H-4}" fill="url(#h${o.id||0})" rx="10"/><circle cx="${(gx0+gx1)/2}" cy="${pb/2+top/2}" r="${thumb?14:28}" fill="var(--panel)"/><text x="${(gx0+gx1)/2}" y="${pb/2+top/2+(thumb?6:12)}" text-anchor="middle" font-size="${thumb?17:34}" font-weight="900" fill="var(--muted)">?</text>`;
   if(!thumb)s+=`<line x1="${gx0}" x2="${gx0}" y1="0" y2="${H}" stroke="var(--muted)" stroke-dasharray="3 4" opacity=".5"/><line x1="${gx1}" x2="${gx1}" y1="0" y2="${H}" stroke="var(--muted)" stroke-dasharray="3 4" opacity=".5"/>`;
   for(const [i,k] of vis)s+=cd(k,cx(i),thumb?.35:1);
@@ -136,7 +142,43 @@ function chart(p,fill,o={}){
   if(vol){const fv=fill?o.fillVol:null,vals=[...vis.map(([i])=>p.volume[i<l?i:i-g]),...(fv||[])],vm=Math.max(...vals)||1,vy=v=>H-2-v/vm*(H-2-H*.82);
     for(const [i,k] of vis){const v=p.volume[i<l?i:i-g];s+=`<rect x="${cx(i)-bw/2}" y="${vy(v)}" width="${bw}" height="${H-2-vy(v)}" rx="1" fill="${k[3]>=k[0]?"var(--up)":"var(--down)"}" opacity=".35"/>`}
     if(fv)fv.forEach((v,j)=>{const k=fill[j];s+=`<rect x="${cx(l+j)-bw/2}" y="${vy(v)}" width="${bw}" height="${H-2-vy(v)}" rx="1" fill="${k[3]>=k[0]?"var(--up)":"var(--down)"}" opacity=".35"/>`})}
+  if(o.draw){const yv=v=>pb-(v-lo)/(hi-lo)*(pb-top),xt=tt=>gx0+st*(tt+.5),endV=p.options[0][g-1][3];
+    const pts=drawnPoints(o.drawn||[],g,endV);
+    s+=`<path id="${o.style?"dl2":"dl"}" d="${o.drawn&&o.drawn.length?pts.map(([tt,v],i)=>(i?"L":"M")+xt(tt).toFixed(1)+","+yv(v).toFixed(1)).join(""):""}" fill="none" stroke="var(--accent)" stroke-width="${o.style?3:4}" stroke-linecap="round" stroke-linejoin="round" ${o.style?'opacity=".9" stroke-dasharray="7 5"':''}/>`;
+    s+=`<circle cx="${xt(-1)}" cy="${yv(1)}" r="7" fill="var(--accent)" stroke="var(--panel)" stroke-width="3"/><circle cx="${xt(g-1)}" cy="${yv(endV)}" r="7" fill="var(--accent)" stroke="var(--panel)" stroke-width="3"/>`;
+    if(!o.style&&!(o.drawn&&o.drawn.length))s+=`<text id="dh" x="${(gx0+gx1)/2}" y="${top+30}" text-anchor="middle" font-size="${innerWidth<560?26:16}" font-weight="800" fill="var(--accent)">✍️ 점에서 점까지 그려 보세요</text>`;}
   return s+"</svg>";
+}
+let GEO=null;
+/* 그린 점(t: 빈칸 안 캔들 위치, v: 가격 비율)을 양 끝 고정점과 함께 정렬해서 돌려준다 */
+function drawnPoints(raw,g,endV){
+  const pts=raw.filter(([tt])=>tt>-1&&tt<g-1).sort((a,b)=>a[0]-b[0]);
+  return [[-1,1],...pts,[g-1,endV]];
+}
+/* 일치도: 캔들마다 그린 선의 값과 실제 종가의 차이를 평균 내서, 빈칸 안 움직임 폭의 절반으로 나눈다 */
+function drawScore(raw,real){
+  const g=real.length,pts=drawnPoints(raw,g,real[g-1][3]);
+  const at=tt=>{for(let i=1;i<pts.length;i++)if(pts[i][0]>=tt){const [a,va]=pts[i-1],[b,vb]=pts[i];return b==a?vb:va+(vb-va)*(tt-a)/(b-a)}return pts[pts.length-1][1]};
+  const closes=real.map(k=>k[3]),all=[1,...closes],scale=Math.max(Math.max(...all)-Math.min(...all),.03);
+  let err=0;for(let j=0;j<g-1;j++)err+=Math.abs(at(j)-closes[j]);err/=Math.max(g-1,1);
+  return Math.round(100*Math.max(0,1-2*err/scale));
+}
+function drawCoverage(raw,g){if(raw.length<2)return 0;const ts=raw.map(r=>r[0]);return (Math.min(Math.max(...ts),g-1)-Math.max(Math.min(...ts),-1))/g}
+function bindDraw(){
+  const svg=document.querySelector('.main svg');if(!svg||!GEO)return;svg.style.touchAction='none';svg.style.cursor='crosshair';
+  const toPt=e=>{const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const m=pt.matrixTransform(svg.getScreenCTM().inverse());
+    const tt=(m.x-GEO.gx0)/GEO.st-.5,v=GEO.lo+(GEO.pb-m.y)/(GEO.pb-GEO.top)*(GEO.hi-GEO.lo);return [Math.max(-1,Math.min(GEO.G-1,tt)),v]};
+  let down=false;
+  svg.addEventListener('pointerdown',e=>{if(S.done)return;down=true;svg.setPointerCapture(e.pointerId);
+    const p0=toPt(e);S.drawn=S.drawn.filter(([tt])=>tt<p0[0]-.3);S.drawn.push(p0);redrawLine()});
+  svg.addEventListener('pointermove',e=>{if(!down)return;const p1=toPt(e),last=S.drawn[S.drawn.length-1];
+    if(p1[0]<last[0])S.drawn=S.drawn.filter(([tt])=>tt<p1[0]);S.drawn.push(p1);redrawLine()});
+  const up=()=>{if(down){down=false;render()}};svg.addEventListener('pointerup',up);svg.addEventListener('pointercancel',up);
+}
+function redrawLine(){
+  const el=document.getElementById('dl');if(!el)return;const hint=document.getElementById('dh');if(hint)hint.remove();
+  const yv=v=>GEO.pb-(v-GEO.lo)/(GEO.hi-GEO.lo)*(GEO.pb-GEO.top),xt=tt=>GEO.gx0+GEO.st*(tt+.5);
+  el.setAttribute('d',drawnPoints(S.drawn,GEO.G,GEO.end).map(([tt,v],i)=>(i?"L":"M")+xt(tt).toFixed(1)+","+yv(v).toFixed(1)).join(""));
 }
 
 function home(){
@@ -146,7 +188,7 @@ function home(){
   app.innerHTML=`<div class="hero"><div class="logo"><i>?</i>빈칸 차트</div>
   <p class="muted" style="margin:10px 2px 0;line-height:1.5">실제 주식 차트의 가려진 구간,<br>진짜로 이어진 모양을 맞혀 보세요.</p></div>
   <div class="card" style="padding:18px 16px 20px">
-    <div class="label" style="margin-top:0">문제 방식</div>${seg("type",[["choice4","4지선다"],["ox","O / X"]])}
+    <div class="label" style="margin-top:0">문제 방식</div>${seg("type",[["choice4","4지선다"],["ox","O / X"],["draw","그리기"]])}
     <div class="label">난이도</div>${seg("diff",[["easy","쉬움"],["normal","보통"],["hard","어려움"]])}
     <div class="label">차트 단위</div>${seg("iv",[["day","일봉"],["week","주봉"]])}
     <div class="row xs muted" style="margin-top:16px"><span>이 조건 남은 문제</span><span class="sp"></span><b class="tnum" style="color:var(--ink)">${left}</b>&nbsp;/ ${pool.length}</div>
@@ -164,39 +206,47 @@ function start(){
 }
 
 function next(){
-  const q=S.list[S.i];Object.assign(S,{q,order:shuffle([0,1,2,3]),ox:Math.random()<.5?0:1+(Math.random()*3|0),sel:null,done:false,t0:performance.now(),lim:LIM[cfg.type][q.d]*1000});
+  const q=S.list[S.i];Object.assign(S,{q,order:shuffle([0,1,2,3]),ox:Math.random()<.5?0:1+(Math.random()*3|0),sel:null,done:false,drawn:[],acc:0,mh:undefined,t0:performance.now(),lim:LIM[cfg.type][q.d]*1000});
   render();window.scrollTo(0,0);clearInterval(timer);
   timer=setInterval(()=>{const left=S.lim-(performance.now()-S.t0),b=$("#tb");if(b){b.style.width=Math.max(left/S.lim*100,0)+"%";b.classList.toggle("hurry",left<5000)}if(left<=0)answer(null)},100);
 }
 
 function render(){
-  const q=S.q,p=q.p,o=p.options,ox=cfg.type=="ox",ov=p.option_volume;
+  const q=S.q,p=q.p,o=p.options,ox=cfg.type=="ox",draw=cfg.type=="draw",ov=p.option_volume;
   let fill=null,fillVol=null,ghost=null,style=null;
   if(S.done){style="real";fill=o[0];fillVol=ov&&ov[0];
     if(ox&&S.ox!==0)ghost=o[S.ox];if(!ox&&S.ans!=null&&S.order[S.ans]!==0)ghost=o[S.order[S.ans]]}
+  else if(draw){}
   else if(ox){fill=o[S.ox];fillVol=ov&&ov[S.ox]}
   else if(S.sel!=null){fill=o[S.order[S.sel]];fillVol=ov&&ov[S.order[S.sel]]}
   const range=ox?[o[0],o[S.ox]]:o;
-  const fit=!ox&&!S.done, cw=Math.min(innerWidth,720)-44, vh=innerHeight;
+  const fit=!ox&&!draw&&!S.done, cw=Math.min(innerWidth,720)-44, vh=innerHeight;
   const mh=fit?Math.max(200,Math.round(vh*.30*720/cw)):undefined, tw=(cw-10)/2-12, th=fit?Math.max(80,Math.round(vh*.135*220/tw)):undefined;
   const dots=Array.from({length:10},(_,i)=>`<i class="${i<S.res.length?(S.res[i].ok?"ok":"no"):i==S.i?"cur":""}"></i>`).join("");
   let h=`<div class="top"><div class="row"><button aria-label="그만하기" class="muted" style="font-size:22px;padding:4px 6px 4px 0" onclick="home()">✕</button>
     <b class="tnum">${S.i+1}<span class="muted"> / 10</span></b><span class="sp"></span>${S.streak>=2?`<b style="color:var(--accent)">🔥 ${S.streak}</b>`:""}<b class="tnum">${S.score.toLocaleString()}점</b></div>
     <div class="dots">${dots}</div>${S.done?"":`<div class="timer"><i id="tb" style="width:100%"></i></div>`}</div>
   <div class="tags"><span>${L[q.m]}</span><span>${L[q.t]}</span><span>${L[q.iv]}</span><span>${L[q.d]}</span></div>
-  <div class="card main">${chart(p,fill,{ghost,range,style,fillVol,id:9,mh})}</div>`;
+  <div class="card main">${draw?chart(p,fill,{range:o,style,fillVol,id:9,mh:S.mh,draw:true,drawn:S.drawn,geo:true}):chart(p,fill,{ghost,range,style,fillVol,id:9,mh})}</div>`;
 
   if(S.done){const r=q.r,ok=S.ok,pc=v=>`<b class="${v>0?"up":v<0?"dn":""}">${v>0?"+":""}${v.toFixed(1)}%</b>`;
-    const sub=ox?(S.ox===0?"보여 드린 모양이 실제였어요.":"보여 드린 모양은 가짜였어요. 흐린 것이 가짜, 선명한 것이 실제예요."):(!ok&&S.ans!=null?"흐리게 겹친 것이 내가 고른 모양이에요.":"");
+    const sub=draw?`일치도 ${S.acc}% · 통과 기준 ${DRAW_PASS[q.d]}%${S.ans==null&&!S.drawn.length?" (시간 초과)":""}. 점선이 내가 그린 흐름, 캔들이 실제예요.`:ox?(S.ox===0?"보여 드린 모양이 실제였어요.":"보여 드린 모양은 가짜였어요. 흐린 것이 가짜, 선명한 것이 실제예요."):(!ok&&S.ans!=null?"흐리게 겹친 것이 내가 고른 모양이에요.":"");
     h+=`<div class="card verdict ${ok?"":"shake"}" style="border:2px solid ${ok?"var(--good)":"var(--bad)"}">
-      <div class="row"><h2 style="color:${ok?"var(--good)":"var(--bad)"}">${ok?"정답!":S.ans==null?"시간 초과":"아쉬워요"}</h2><span class="sp"></span><b class="tnum" style="font-size:18px">+${S.pts}</b></div>
+      <div class="row"><h2 style="color:${ok?"var(--good)":"var(--bad)"}">${draw?(S.acc>=85?"거의 똑같아요!":ok?"잘 그렸어요":"아쉬워요"):ok?"정답!":S.ans==null?"시간 초과":"아쉬워요"}</h2><span class="sp"></span><b class="tnum" style="font-size:18px">+${S.pts}</b></div>
       ${sub?`<p class="sm muted" style="margin:6px 0 0">${sub}</p>`:""}
+      ${draw?`<div class="accbar"><i style="width:${S.acc}%;background:${ok?"var(--good)":"var(--bad)"}"></i><span style="left:${DRAW_PASS[q.d]}%"></span></div>`:""}
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)"><b style="font-size:19px">${r.name}</b> <span class="sm muted">${r.code}</span>
       <div class="sm muted" style="margin-top:2px">당시 ${L[r.cap_tier_then]} · ${r.gap_start} ~ ${r.gap_end}</div></div>
       <div class="stats"><div><span class="xs muted">빈칸 수익률</span>${pc(r.gap_return_pct)}</div><div><span class="xs muted">구간 최고</span>${pc(r.gap_max_pct)}</div><div><span class="xs muted">구간 최저</span>${pc(r.gap_min_pct)}</div></div>
       ${r.delisted?`<p class="xs muted" style="margin:10px 0 0">이 종목은 ${r.delisted.date}에 상장폐지됐어요 (${r.delisted.reason}).</p>`:""}</div>`}
 
-  if(!ox){
+  if(draw){
+    if(!S.done){const cov=drawCoverage(S.drawn,q.p.layout.G);
+      h+=`<div class="q" style="margin-top:12px">빈칸 안의 흐름을 손가락으로 그려 보세요</div>
+      <p class="xs muted" style="margin:-4px 2px 10px;line-height:1.5">왼쪽 점에서 오른쪽 점까지 이어 그리면 돼요. 실제 종가와 가까울수록 점수가 높고, 일치도 ${DRAW_PASS[q.d]}% 미만은 0점이에요.</p>
+      <div class="row" style="gap:10px"><button class="ghost" style="margin:0;flex:1" onclick="S.drawn=[];render()" ${S.drawn.length?"":"disabled"}>다시 그리기</button>
+      <button class="cta" style="flex:2" onclick="answer('draw')" ${cov<.6?"disabled":""}>${cov<.6?"빈칸을 더 채워 주세요":"제출"}</button></div>`}
+  } else if(!ox){
     h+=`<div class="q${fit?" fitq":""}">${S.done?"보기":"빈칸에 실제로 들어간 모양은?"}</div><div class="grid">`+S.order.map((k,i)=>{
       const cls=S.done?(k===0?"real":S.ans===i?"wrong":"dim"):(S.sel===i?"sel":"");
       const badge=S.done&&k===0?`<span class="badge" style="background:var(--good)">실제</span>`:S.done&&S.ans===i?`<span class="badge" style="background:var(--bad)">내 선택</span>`:"";
@@ -208,12 +258,18 @@ function render(){
       <button style="color:var(--bad);border-color:var(--bad)" onclick="answer('X')" aria-label="X, 가짜다">X</button></div>`;
   }
   if(S.done)h+=`<div style="margin-top:16px"><button class="cta" onclick="advance()">${S.i==9?"결과 보기":"다음 문제"}</button></div>`;
-  app.innerHTML=h;app.classList.toggle('fit',fit);
+  app.innerHTML=h;app.classList.toggle('fit',fit);if(draw&&!S.done)bindDraw();
 }
 function pick(i){if(S.sel===i)answer(i);else{S.sel=i;render()}}
 function advance(){S.i++;S.i<10?next():result()}
 function answer(c){
   if(!S||S.done)return;clearInterval(timer);const el=performance.now()-S.t0,q=S.q;
+  if(cfg.type=="draw"){
+    const acc=c==null&&drawCoverage(S.drawn,q.p.layout.G)<.6?0:drawScore(S.drawn,q.p.options[0]),thr=DRAW_PASS[q.d],ok=acc>=thr;
+    const pts=ok?Math.round(DRAW_MAX*MUL[q.d]*(acc-thr)/(100-thr)*Math.min(1+.1*S.streak,2)):0;
+    Object.assign(S,{done:true,ans:c,ok,acc,pts,score:S.score+pts,streak:ok?S.streak+1:0});S.res.push({ok,q,pts,acc});
+    seen.add(key(q));save();render();window.scrollTo({top:0,behavior:"smooth"});return;
+  }
   const ok=c!=null&&el<=S.lim+300&&(cfg.type=="ox"?(c=="O")==(S.ox===0):S.order[c]===0);
   const base=100*MUL[q.d],pts=ok?Math.round((base+base*.5*Math.max(0,1-el/S.lim))*Math.min(1+.1*S.streak,2)*(cfg.type=="ox"?.5:1)):0;
   Object.assign(S,{done:true,ans:c,ok,pts,score:S.score+pts,streak:ok?S.streak+1:0});S.res.push({ok,q,pts});
@@ -221,11 +277,11 @@ function answer(c){
 }
 function result(){
   const n=S.res.filter(r=>r.ok).length,marks=S.res.map(r=>r.ok?"🟩":"🟥").join(""),msg=n>=9?"차트 고수!":n>=7?"감이 좋아요":n>=5?"나쁘지 않아요":"다음엔 더 잘할 거예요";
-  app.innerHTML=`<div class="hero" style="text-align:center"><div class="muted sm">${L[cfg.diff]} · ${cfg.type=="ox"?"O/X":"4지선다"} · ${L[cfg.iv]}</div>
+  app.innerHTML=`<div class="hero" style="text-align:center"><div class="muted sm">${L[cfg.diff]} · ${{ox:"O/X",draw:"그리기",choice4:"4지선다"}[cfg.type]} · ${L[cfg.iv]}</div>
   <div class="score tnum" style="margin-top:10px">${S.score.toLocaleString()}</div><div class="muted" style="margin-top:6px">${msg} · ${n} / 10 정답</div>
   <div style="font-size:22px;margin-top:12px;letter-spacing:2px">${marks}</div></div>
   <div class="card list" style="overflow:hidden"><div class="b sm" style="padding:14px">문제별 결과</div>
-  ${S.res.map(r=>`<div class="item"><span>${r.ok?"🟩":"🟥"}</span><div class="sp" style="min-width:0"><div class="b" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.q.r.name}</div><div class="xs muted">${r.q.r.gap_start} ~ ${r.q.r.gap_end}</div></div>
+  ${S.res.map(r=>`<div class="item"><span>${r.ok?"🟩":"🟥"}</span><div class="sp" style="min-width:0"><div class="b" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.q.r.name}</div><div class="xs muted">${r.q.r.gap_start} ~ ${r.q.r.gap_end}${r.acc!=null?` · 일치도 ${r.acc}%`:""}</div></div>
   <span class="sm tnum ${r.q.r.gap_return_pct>0?"up":"dn"}">${r.q.r.gap_return_pct>0?"+":""}${r.q.r.gap_return_pct.toFixed(1)}%</span><b class="tnum" style="width:42px;text-align:right">${r.pts}</b></div>`).join("")}</div>
   <div style="margin-top:16px"><button class="cta" onclick="start()">한 판 더</button><button class="ghost" onclick="copyRes('${marks}',${n})">결과 복사</button><button class="ghost" onclick="home()">처음으로</button></div><p id="note" class="xs muted" style="text-align:center"></p>`;
 }
