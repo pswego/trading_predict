@@ -12,7 +12,25 @@ from ..sources.listing import load_stocks
 from . import clean
 
 LAB = {"KOSPI": "코스피", "KOSDAQ": "코스닥", "large": "대형", "mid": "중형", "small": "소형", "micro": "초소형",
-       "easy": "쉬움", "normal": "보통", "hard": "어려움", "day": "일봉", "week": "주봉"}
+       "easy": "쉬움", "normal": "보통", "hard": "어려움", "day": "일봉", "week": "주봉",
+       "2000s": "2000년대", "2010s": "2010년대", "2020s": "2020년대"}
+TRAIT = {"S": "빈칸 안에서 직선 경로를 벗어난 정도", "nogap": "시가가 전날 종가와 같은 날의 비율", "range": "봉 길이(고가-저가)",
+         "flat": "종가가 안 변한 날의 비율", "body": "몸통 비율", "sd": "변동성", "eff": "추세 효율", "dn": "아래꼬리 비율",
+         "up": "위꼬리 비율", "ac1": "수익률의 연속성", "ac1abs": "변동성의 연속성", "doji": "시가=종가인 봉의 비율",
+         "gapopen": "시가 갭 크기", "kurt": "급등락 빈도", "maxr": "가장 큰 하루 움직임", "skew": "상승·하락 비대칭",
+         "run": "같은 방향 연속 일수", "first_gap": "첫 봉의 시가 갭", "first_r": "첫 봉 수익률", "last_r": "마지막 봉 수익률",
+         "vcorr": "거래량과 움직임의 상관", "vcv": "거래량 변동", "vmean": "거래량 수준"}
+
+
+def _tells(report: dict, difficulty: str) -> str:
+    seen, parts = set(), []
+    for key, v in report["top_tells"].get(difficulty, {}).items():
+        base = key.replace("_rel", "").replace("_ratio", "")
+        if base in seen:
+            continue
+        seen.add(base)
+        parts.append(f"{TRAIT.get(base, base)}(실제가 최대일 확률 {v['real_is_max']:.0%}, 최소일 확률 {v['real_is_min']:.0%})")
+    return ", ".join(parts[:3])
 
 
 def _table(df: pd.DataFrame) -> str:
@@ -128,8 +146,14 @@ def write() -> str:
                     rows.append({"단위": LAB[iv], "난이도": LAB[d], "판별기 정답률": f"{r['accuracy'][d]:.1%}",
                                  "조정 후": f"{after:.1%}", "기준": th, "결과": ok})
             out.append(f"- {LAB[iv]}: 판별기가 60% 넘는 확신으로 맞힌 '어려움' 문제 {r['downgraded_hard']:,}개를 '보통'으로 내렸습니다. "
-                       f"아직 남은 단서(어려움 기준): {', '.join(list(r['top_tells'].get('hard', {}))[:4])}\n")
+                       f"아직 남은 단서(어려움 기준, 25%면 단서 없음): {_tells(r, 'hard')}\n")
         out.append("\n" + _table(pd.DataFrame(rows)))
+        out.append("\n**해석.** 처음 만든 생성기에서는 판별기 정답률이 보통 69%, 어려움 74%였고, 원인을 찾아 고친 뒤 위 수치까지 내려왔습니다. "
+                   "계획서의 목표(보통 45%, 어려움 35%)에는 아직 못 미칩니다. 남은 단서는 '시가가 전날 종가와 정확히 같은 날이 "
+                   "몇 %인가'처럼 여러 봉을 세어 봐야 드러나는 통계적 차이입니다. 샘플 이미지를 직접 봤을 때는 구별하지 못했지만, "
+                   "사람이 실제로 플레이한 정답률로 검증한 것은 아닙니다. "
+                   "특징 하나만 보고 실제를 고르는 요령(예: 변동성이 중간인 보기 고르기)은 약해졌습니다: 위에 적은 특징들에서 "
+                   "실제 보기가 최대이거나 최소일 확률은 25%에서 최대 9%p 벗어납니다.\n")
     else:
         out.append("아직 문제를 생성하지 않았습니다. `chartgame all` 을 먼저 실행하세요.\n")
 
