@@ -103,11 +103,11 @@ def recalibrate(min_plays: int = 30):
 
 
 @app.command()
-def standalone():
-    """서버가 /game 에서 서비스할 한 파일짜리 게임 페이지를 만든다."""
+def standalone(site: bool = False):
+    """한 파일짜리 게임을 만든다. 기본: 서버용 static/game.html. --site: 정적 호스팅용 site/index.html (P2P 대전)."""
     from .pipeline import standalone as s
 
-    typer.echo(s.write())
+    typer.echo(s.write_site() if site else s.write())
 
 
 @app.command()

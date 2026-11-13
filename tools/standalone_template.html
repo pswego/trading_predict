@@ -440,7 +440,7 @@ async function battleLobby(){
   const r=B.room;
   const open=(B.lobby||[]).filter(p=>!p.isMe&&p.presence&&p.presence.hosting&&p.presence.hosting.status=="lobby").slice(0,20);
   app.innerHTML=`<div class="row" style="margin:6px 0 10px"><button class="muted" style="font-size:22px;padding:4px 6px 4px 0" onclick="B.view=null;home()" aria-label="뒤로">←</button><b style="font-size:20px">온라인 대전</b></div>
-  ${!r?`<div class="card lesson"><h3>지금은 대전을 할 수 없어요</h3><p>온라인 대전은 이 게임을 <b>claude.ai에 게시된 페이지</b>로, 로그인한 상태에서 열었을 때만 동작해요. 파일로 직접 연 경우에는 혼자 하기만 할 수 있어요.</p></div>`:`
+  ${!r?`<div class="card lesson"><h3>지금은 대전을 할 수 없어요</h3><p>온라인 대전 연결을 준비하지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요. 파일로 직접 연 경우에는 혼자 하기만 할 수 있어요.</p></div>`:`
   <div class="card" style="padding:16px"><label class="label" for="nick" style="margin-top:0;display:block">내 닉네임</label>
     <input id="nick" class="inp" maxlength="12" placeholder="2~12자" value="${esc(nick)}" oninput="nick=cleanNick(this.value);try{localStorage.setItem('cg_nick',nick)}catch(e){}">
     <div class="label">방 만들기 <span class="xs muted" style="font-weight:600">(지금 첫 화면에서 고른 조건: ${cfgLabel(cfg)})</span></div>
@@ -448,8 +448,9 @@ async function battleLobby(){
     <div class="label">코드로 참가</div>
     <div class="row"><input id="code" class="inp" maxlength="4" placeholder="4자리 코드" style="text-transform:uppercase;flex:1" onkeydown="if(event.key=='Enter')battleJoin(this.value)"><button class="ghost" style="margin:0;width:auto;padding:13px 18px" onclick="battleJoin(document.getElementById('code').value)">참가</button></div>
     <p id="bmsg" class="xs" style="color:var(--bad);margin:8px 0 0"></p></div>
+  ${r.p2p?`<p class="sm muted" style="margin-top:16px;line-height:1.6">방을 만든 사람에게 <b>4자리 코드</b>를 받아 입력하세요. 같은 링크로 들어온 사람끼리 브라우저가 직접 연결돼요.</p>`:`
   <div class="label" style="margin-top:20px">열린 방 ${open.length?`<span class="muted">${open.length}</span>`:""}</div>
-  ${open.length?open.map(p=>{const h=p.presence.hosting;return `<button class="card study-entry" style="margin-top:8px" onclick="battleJoin('${esc(String(h.code||"")).replace(/[^A-Z0-9]/g,"")}')"><span class="ic" style="font-weight:900;font-size:15px">${esc(h.code)}</span><span class="sp" style="text-align:left"><b>${esc(cleanNick(h.nick)||"익명")}의 방</b><br><span class="xs muted">${esc(cfgLabel(h.cfg))} · ${Number(h.n)||1}명</span></span><span class="muted">참가 ›</span></button>`}).join(""):`<p class="sm muted">지금 열린 방이 없어요. 방을 만들고 친구에게 코드를 알려 주세요. 같은 페이지 링크로 들어와야 보여요.</p>`}`}`;
+  ${open.length?open.map(p=>{const h=p.presence.hosting;return `<button class="card study-entry" style="margin-top:8px" onclick="battleJoin('${esc(String(h.code||"")).replace(/[^A-Z0-9]/g,"")}')"><span class="ic" style="font-weight:900;font-size:15px">${esc(h.code)}</span><span class="sp" style="text-align:left"><b>${esc(cleanNick(h.nick)||"익명")}의 방</b><br><span class="xs muted">${esc(cfgLabel(h.cfg))} · ${Number(h.n)||1}명</span></span><span class="muted">참가 ›</span></button>`}).join(""):`<p class="sm muted">지금 열린 방이 없어요. 방을 만들고 친구에게 코드를 알려 주세요. 같은 페이지 링크로 들어와야 보여요.</p>`}`}`}`;
 }
 function needNick(){if(cleanNick(nick).length<2){const m=$("#bmsg");if(m)m.textContent="닉네임을 2자 이상 입력해 주세요.";$("#nick")?.focus();return true}return false}
 async function battleCreate(){if(needNick())return;const code=Array.from({length:4},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.random()*32|0]).join("");await battleEnter(code,true)}
