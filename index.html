@@ -102,6 +102,9 @@ svg{display:block;width:100%;height:auto}
 .bp{flex:1 0 110px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:12px;display:grid;grid-template-columns:1fr auto;gap:2px 6px}
 .bp.me{border-color:var(--accent)}.bp b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bp .mini-dots{grid-column:1/-1}
 .mini-dots{display:flex;gap:2px;margin-top:3px}.mini-dots i{flex:1;height:3px;border-radius:3px;background:var(--panel2);min-width:6px}.mini-dots i.ok{background:var(--good)}.mini-dots i.no{background:var(--bad)}
+.plgrid{display:grid;grid-template-columns:1fr;overflow:hidden}@media(min-width:560px){.plgrid{grid-template-columns:1fr 1fr}.plgrid .pl:nth-child(2){border-top:0}}
+.waitbar{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;gap:4px;text-align:center;box-shadow:var(--shadow)}
+.waitbar span{font-size:14px;color:var(--muted)}.bp.more{display:grid;place-items:center;flex:0 0 70px}
 /* 결과 */
 .nextbar{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:linear-gradient(transparent,var(--bg) 30%)}
 .nextbar>div{max-width:688px;margin:0 auto}
@@ -291,20 +294,20 @@ function home(){
     <div class="row xs muted" style="margin-top:16px"><span>이 조건 남은 문제</span><span class="sp"></span><b class="tnum" style="color:var(--ink)">${left}</b>&nbsp;/ ${pool.length}</div>
   </div>
   <div style="margin-top:16px"><button class="cta" onclick="start()">10문제 시작</button></div>
-  <button class="card study-entry" onclick="battleLobby()"><span class="ic">⚔️</span><span class="sp" style="text-align:left"><b>온라인 대전</b><br><span class="xs muted">같은 10문제로 실시간 점수 대결 · 방 만들기 / 코드로 참가</span></span><span class="muted">›</span></button>
+  <button class="card study-entry" onclick="battleLobby()"><span class="ic">⚔️</span><span class="sp" style="text-align:left"><b>온라인 대전</b><br><span class="xs muted">최대 50명 · 문제마다 다 같이 넘어가는 실시간 대결</span></span><span class="muted">›</span></button>
   <button class="card study-entry" onclick="study()"><span class="ic">📘</span><span class="sp" style="text-align:left"><b>차트 공부하기</b><br><span class="xs muted">캔들 · 추세 · 패턴 사전 18종 · 캔들 조합 8종 · 데이터 경향성</span></span><span class="muted">›</span></button>
   <p class="xs muted" style="text-align:center;margin-top:22px;line-height:1.7">테스트판 · 실제 문제 ${Q.length}개 수록<br>과거 데이터 기반 오락용이며 투자 권유가 아닙니다 · 가격 출처: 네이버 금융<br>
   <button class="xs muted" style="text-decoration:underline" onclick="seen.clear();save();home()">푼 문제 기록 지우기</button></p>`;
 }
 
-function pickList(pool){const list=[],used=new Set();for(const q of shuffle(pool)){if(used.has(q.r.code))continue;used.add(q.r.code);list.push(q);if(list.length==10)break}return list}
+function pickList(pool,n=10){const list=[],used=new Set();for(const q of shuffle(pool)){if(used.has(q.r.code))continue;used.add(q.r.code);list.push(q);if(list.length==n)break}return list}
 function start(){
   rnd=Math.random;const pool=Q.filter(q=>q.iv==cfg.iv&&q.d==cfg.diff);let fresh=pool.filter(q=>!seen.has(key(q)));if(fresh.length<10)fresh=pool;
   S={list:pickList(fresh),i:0,score:0,streak:0,res:[]};next();
 }
 
 function next(){
-  const q=S.list[S.i];if(S.battle)rnd=mulberry(S.battle.seed*31+S.i+1);Object.assign(S,{q,order:shuffle([0,1,2,3]),ox:rnd()<.5?0:1+(rnd()*3|0),sel:null,done:false,drawn:[],acc:0,mh:undefined,t0:performance.now(),lim:LIM[cfg.type][q.d]*1000});
+  const q=S.list[S.i];if(S.battle)rnd=mulberry(S.battle.seed*31+S.i+1);Object.assign(S,{q,order:shuffle([0,1,2,3]),ox:rnd()<.5?0:1+(rnd()*3|0),sel:null,done:false,drawn:[],acc:0,mh:undefined,t0:performance.now(),lim:(S.battle?S.battle.sec:LIM[cfg.type][q.d])*1000});
   render();window.scrollTo(0,0);clearInterval(timer);
   timer=setInterval(()=>{const left=S.lim-(performance.now()-S.t0),b=$("#tb");if(b){b.style.width=Math.max(left/S.lim*100,0)+"%";b.classList.toggle("hurry",left<5000)}if(left<=0)answer(null)},100);
 }
@@ -320,9 +323,9 @@ function render(){
   const range=ox?[o[0],o[S.ox]]:o;
   const fit=!ox&&!draw&&!S.done, cw=Math.min(innerWidth,720)-44, vh=innerHeight;
   const mh=fit?Math.max(200,Math.round(vh*.30*720/cw)):undefined, tw=(cw-10)/2-12, th=fit?Math.max(80,Math.round(vh*.135*220/tw)):undefined;
-  const dots=Array.from({length:10},(_,i)=>`<i class="${i<S.res.length?(S.res[i].ok?"ok":"no"):i==S.i?"cur":""}"></i>`).join("")+(S.battle?"</div>"+battleStrip()+"<div style=\"display:none\">":"");
+  const dots=Array.from({length:S.list.length},(_,i)=>`<i class="${i<S.res.length?(S.res[i].ok?"ok":"no"):i==S.i?"cur":""}"></i>`).join("")+(S.battle?"</div>"+battleStrip()+"<div style=\"display:none\">":"");
   let h=`<div class="top"><div class="row"><button aria-label="그만하기" class="muted" style="font-size:22px;padding:4px 6px 4px 0" onclick="home()">✕</button>
-    <b class="tnum">${S.i+1}<span class="muted"> / 10</span></b><span class="sp"></span>${S.streak>=2?`<b style="color:var(--accent)">🔥 ${S.streak}</b>`:""}<b class="tnum">${S.score.toLocaleString()}점</b></div>
+    <b class="tnum">${S.i+1}<span class="muted"> / ${S.list.length}</span></b><span class="sp"></span>${S.streak>=2?`<b style="color:var(--accent)">🔥 ${S.streak}</b>`:""}<b class="tnum">${S.score.toLocaleString()}점</b></div>
     <div class="dots">${dots}</div>${S.done?"":`<div class="timer"><i id="tb" style="width:100%"></i></div>`}</div>
   <div class="tags"><span>${L[q.m]}</span><span>${L[q.t]}</span><span>${L[q.iv]}</span><span>${L[q.d]}</span></div>
   <div class="card main">${draw?chart(p,fill,{range:o,style,fillVol,id:9,mh:S.mh,draw:true,drawn:S.drawn,geo:true}):chart(p,fill,{ghost,range,style,fillVol,id:9,mh})}</div>`;
@@ -356,11 +359,12 @@ function render(){
       <button style="color:var(--good);border-color:var(--good)" onclick="answer('O')" aria-label="O, 실제다">O</button>
       <button style="color:var(--bad);border-color:var(--bad)" onclick="answer('X')" aria-label="X, 가짜다">X</button></div>`;
   }
-  if(S.done)h+=`<div class="nextbar"><div><button class="cta" onclick="advance()">${S.i==9?"결과 보기":"다음 문제"} →</button></div></div>`;
+  if(S.done&&S.battle)h+=`<div class="nextbar"><div id="bwait">${battleWaitHtml()}</div></div>`;
+  else if(S.done)h+=`<div class="nextbar"><div><button class="cta" onclick="advance()">${S.i==S.list.length-1?"결과 보기":"다음 문제"} →</button></div></div>`;
   app.innerHTML=h;app.classList.toggle('fit',fit);if(draw&&!S.done)bindDraw();
 }
 function pick(i){if(S.sel===i)answer(i);else{S.sel=i;render()}}
-function advance(){S.i++;if(S.i<10)next();else if(S.battle)battleFinish();else result()}
+function advance(){S.i++;if(S.i<S.list.length)next();else result()}
 /* ---------- 자동 해설 ----------
    정답 공개 때 차트 숫자를 규칙으로 분석해, 빈칸 모양을 추론하는 데 실제로 쓸모 있는 단서만 골라
    '무엇을 보고 → 그래서 빈칸은 → 실제로' 순서로 설명한다. 패턴 이름은 눌러서 팝업으로 설명을 볼 수 있다. */
@@ -474,122 +478,271 @@ function answer(c){
   if(cfg.type=="draw"){
     const acc=c==null&&drawCoverage(S.drawn,q.p.layout.G)<.6?0:drawScore(S.drawn,q.p.options[0]),thr=DRAW_PASS[q.d],ok=acc>=thr;
     const pts=ok?Math.round(DRAW_MAX*MUL[q.d]*(acc-thr)/(100-thr)*Math.min(1+.1*S.streak,2)):0;
-    Object.assign(S,{done:true,ans:c,ok,acc,pts,score:S.score+pts,streak:ok?S.streak+1:0});S.res.push({ok,q,pts,acc});battleProgress();
+    Object.assign(S,{done:true,ans:c,ok,acc,pts,score:S.score+pts,streak:ok?S.streak+1:0});S.res.push({ok,q,pts,acc});if(S.battle)S.marks[S.i]=ok?'1':'0';battleProgress();
     seen.add(key(q));save();render();window.scrollTo({top:0,behavior:"smooth"});return;
   }
   const ok=c!=null&&el<=S.lim+300&&(cfg.type=="ox"?(c=="O")==(S.ox===0):S.order[c]===0);
   const base=100*MUL[q.d],pts=ok?Math.round((base+base*.5*Math.max(0,1-el/S.lim))*Math.min(1+.1*S.streak,2)*(cfg.type=="ox"?.5:1)):0;
-  Object.assign(S,{done:true,ans:c,ok,pts,score:S.score+pts,streak:ok?S.streak+1:0});S.res.push({ok,q,pts});battleProgress();
+  Object.assign(S,{done:true,ans:c,ok,pts,score:S.score+pts,streak:ok?S.streak+1:0});S.res.push({ok,q,pts});if(S.battle)S.marks[S.i]=ok?'1':'0';battleProgress();
   seen.add(key(q));save();render();window.scrollTo({top:0,behavior:"smooth"});
 }
 function result(){
   const n=S.res.filter(r=>r.ok).length,marks=S.res.map(r=>r.ok?"🟩":"🟥").join(""),msg=n>=9?"차트 고수!":n>=7?"감이 좋아요":n>=5?"나쁘지 않아요":"다음엔 더 잘할 거예요";
   app.innerHTML=`<div class="hero" style="text-align:center"><div class="muted sm">${L[cfg.diff]} · ${{ox:"O/X",draw:"그리기",choice4:"4지선다"}[cfg.type]} · ${L[cfg.iv]}</div>
-  <div class="score tnum" style="margin-top:10px">${S.score.toLocaleString()}</div><div class="muted" style="margin-top:6px">${msg} · ${n} / 10 정답</div>
+  <div class="score tnum" style="margin-top:10px">${S.score.toLocaleString()}</div><div class="muted" style="margin-top:6px">${msg} · ${n} / ${S.res.length} 정답</div>
   <div style="font-size:22px;margin-top:12px;letter-spacing:2px">${marks}</div></div>
   <div class="card list" style="overflow:hidden"><div class="b sm" style="padding:14px">문제별 결과</div>
   ${S.res.map(r=>`<div class="item"><span>${r.ok?"🟩":"🟥"}</span><div class="sp" style="min-width:0"><div class="b" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.q.r.name}</div><div class="xs muted">${r.q.r.gap_start} ~ ${r.q.r.gap_end}${r.acc!=null?` · 일치도 ${r.acc}%`:""}</div></div>
   <span class="sm tnum ${r.q.r.gap_return_pct>0?"up":"dn"}">${r.q.r.gap_return_pct>0?"+":""}${r.q.r.gap_return_pct.toFixed(1)}%</span><b class="tnum" style="width:42px;text-align:right">${r.pts}</b></div>`).join("")}</div>
-  <div style="margin-top:16px"><button class="cta" onclick="start()">한 판 더</button><button class="ghost" onclick="copyRes('${marks}',${n})">결과 복사</button>${B.mroom?`<button class="ghost" onclick="battleResultView()">대전 결과로</button>`:`<button class="ghost" onclick="home()">처음으로</button>`}</div><p id="note" class="xs muted" style="text-align:center"></p>`;
+  <div style="margin-top:16px">${B.mroom?"":`<button class="cta" onclick="start()">한 판 더</button>`}<button class="ghost" onclick="copyRes('${marks}',${n})">결과 복사</button>${B.mroom?`<button class="ghost" onclick="battleResultView()">대전 결과로</button>`:`<button class="ghost" onclick="home()">처음으로</button>`}</div><p id="note" class="xs muted" style="text-align:center"></p>`;
 }
 /* ---------- 온라인 대전 ----------
-   room 기능(지금 이 페이지를 연 사람들)으로 동작한다. 서버에 아무것도 저장하지 않는다.
+   room API(presence / onPeers / join)로 동작한다. 연결은 페이지에 따라 claude.ai room, 우리 서버 WebSocket, 공개 MQTT 중계 중 하나다.
    - 로비(room): 방장이 presence.hosting 에 방 정보를 올리면 다른 사람에게 '열린 방'으로 보인다.
-   - 대전방(room.join("cg-"+코드)): 각자 presence 에 닉네임·준비·진행 상황을 올린다.
-     방장 presence 의 game{round,seed,cfg} 가 게임 정의다. 모두 같은 시드로 같은 10문제·같은 보기 순서를 만든다.
-   presence 는 누구나 쓸 수 있으니 표시용으로만 쓰고, 점수는 각자 자기 기기에서 계산한다. */
-const B={room:null,mroom:null,code:null,host:false,round:0,game:null,peers:[],lobby:[],unsub:[],keep:false,started:0,status:"idle",ready:false};
+   - 대전방(room.join("cg-"+코드)): 각자 presence 에 닉네임·준비·문제별 결과를 올린다.
+     방장 presence 의 game 이 게임 정의이자 진행 상황이다: {round, seed, cfg, n, sec, reveal, max, pwh, title, pub, qi, phase}.
+     모두 같은 시드로 같은 문제·같은 보기 순서를 만든다.
+   - 진행: 문제마다 제한시간이 있고, 모두 답했거나 시간이 끝나면 정답 공개 시간 뒤에 방장이 qi 를 올린다. 모두 그 문제로 넘어간다.
+   presence 는 누구나 쓸 수 있으니 표시용이다. 비밀번호도 화면에서 막는 장치일 뿐 보안 장치는 아니다. */
+const B={room:null,mroom:null,code:null,host:false,round:0,game:null,peers:[],lobby:[],unsub:[],view:null,status:"idle",ready:false,sawHost:false,hostGone:false,joined:0,qStart:0,allDoneAt:0,loop:null,pending:null,form:null};
+const BATTLE_DEFAULT={title:"",type:"choice4",diff:"easy",iv:"day",n:10,sec:20,reveal:5,max:8,pw:"",pub:true};
+const OPTS={n:[5,10,15,20],sec:[10,15,20,30,45,60],reveal:[3,5,8,12]};
 let nick=(()=>{try{return localStorage.getItem("cg_nick")||""}catch(e){return ""}})();
 const roomP=(window.claude&&claude.use)?claude.use("room").catch(()=>null):Promise.resolve(null);
 roomP.then(r=>{B.room=r;if(!r)return;B.unsub.push(r.onPeers(ch=>{B.lobby=ch.peers;if(B.view=="lobby")battleLobby()}))});
 const cfgLabel=c=>c?`${{choice4:"4지선다",ox:"O/X",draw:"그리기"}[c.type]||""} · ${L[c.diff]||""} · ${L[c.iv]||""}`:"";
 function cleanNick(s){return String(s||"").replace(/[\u0000-\u001f<>]/g,"").trim().slice(0,12)}
-async function battleLobby(){
+function cleanTitle(s){return String(s||"").replace(/[\u0000-\u001f<>]/g,"").trim().slice(0,24)}
+const clampInt=(v,lo,hi,d)=>{v=Math.round(Number(v));return Number.isFinite(v)?Math.min(hi,Math.max(lo,v)):d};
+async function pwHash(code,pw){
+  const s=`chartgap|${code}|${pw}`;
+  try{const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return [...new Uint8Array(buf)].slice(0,10).map(b=>b.toString(16).padStart(2,"0")).join("")}
+  catch(e){let h=2166136261;for(const ch of s){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return (h>>>0).toString(16)}
+}
+function gameInfo(g){if(!g)return "";return `${cfgLabel(g.cfg)} · ${g.n}문제 · 문제당 ${g.sec}초`}
+function topBack(label,fn){return `<div class="row" style="margin:6px 0 10px"><button class="muted" style="font-size:22px;padding:4px 6px 4px 0" onclick="${fn}" aria-label="뒤로">←</button><b style="font-size:20px">${label}</b></div>`}
+
+/* ---- 로비 ---- */
+function battleLobby(msg){
+  // 목록이 바뀔 때마다 다시 그리므로, 입력 중인 값과 안내 문구를 지키며 그린다
+  const keepCode=$("#code")?.value,keepPw=$("#pw")?.value,focus=document.activeElement&&document.activeElement.id;
+  if(msg!==undefined)B.lobbyMsg=msg;
   S=null;clearInterval(timer);app.classList.remove('fit');B.view="lobby";
   const r=B.room;
-  const open=(B.lobby||[]).filter(p=>!p.isMe&&p.presence&&p.presence.hosting&&p.presence.hosting.status=="lobby").slice(0,20);
-  app.innerHTML=`<div class="row" style="margin:6px 0 10px"><button class="muted" style="font-size:22px;padding:4px 6px 4px 0" onclick="B.view=null;home()" aria-label="뒤로">←</button><b style="font-size:20px">온라인 대전</b></div>
-  ${!r?`<div class="card lesson"><h3>지금은 대전을 할 수 없어요</h3><p>온라인 대전 연결을 준비하지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요. 파일로 직접 연 경우에는 혼자 하기만 할 수 있어요.</p></div>`:`
+  const open=(B.lobby||[]).filter(p=>!p.isMe&&p.presence&&p.presence.hosting&&p.presence.hosting.pub!==false&&Math.abs(Date.now()-(Number(p.presence.hosting.ts)||0))<90000).map(p=>p.presence.hosting).slice(0,30);
+  const pend=B.pending;
+  app.innerHTML=topBack("온라인 대전","B.view=null;home()")+(!r?`<div class="card lesson"><h3>지금은 대전을 할 수 없어요</h3><p>온라인 대전 연결을 준비하지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요. 파일로 직접 연 경우에는 혼자 하기만 할 수 있어요.</p></div>`:`
   <div class="card" style="padding:16px"><label class="label" for="nick" style="margin-top:0;display:block">내 닉네임</label>
     <input id="nick" class="inp" maxlength="12" placeholder="2~12자" value="${esc(nick)}" oninput="nick=cleanNick(this.value);try{localStorage.setItem('cg_nick',nick)}catch(e){}">
-    <div class="label">방 만들기 <span class="xs muted" style="font-weight:600">(지금 첫 화면에서 고른 조건: ${cfgLabel(cfg)})</span></div>
-    <button class="cta" onclick="battleCreate()">새 방 만들기</button>
+    <div class="row" style="margin-top:14px;gap:10px"><button class="cta" style="flex:1" onclick="battleForm()">방 만들기</button></div>
     <div class="label">코드로 참가</div>
-    <div class="row"><input id="code" class="inp" maxlength="4" placeholder="4자리 코드" style="text-transform:uppercase;flex:1" onkeydown="if(event.key=='Enter')battleJoin(this.value)"><button class="ghost" style="margin:0;width:auto;padding:13px 18px" onclick="battleJoin(document.getElementById('code').value)">참가</button></div>
-    <p id="bmsg" class="xs" style="color:var(--bad);margin:8px 0 0"></p></div>
-  ${false?`<p class="sm muted" style="margin-top:16px;line-height:1.6">방을 만든 사람에게 <b>4자리 코드</b>를 받아 입력하세요. 같은 링크로 들어온 사람끼리 브라우저가 직접 연결돼요.</p>`:`
+    <div class="row"><input id="code" class="inp" maxlength="4" placeholder="4자리 코드" style="text-transform:uppercase;flex:1" value="${esc(keepCode||(pend?pend.code:""))}" onkeydown="if(event.key=='Enter')battleJoin()"><button class="ghost" style="margin:0;width:auto;padding:13px 18px" onclick="battleJoin()">참가</button></div>
+    ${pend&&pend.lock?`<label class="label" for="pw" style="display:block">🔒 비밀번호</label><input id="pw" class="inp" type="password" maxlength="12" placeholder="방장에게 받은 비밀번호" value="${esc(msg===undefined&&keepPw?keepPw:"")}" onkeydown="if(event.key=='Enter')battleJoin()">`:""}
+    <p id="bmsg" class="xs" style="color:var(--bad);margin:8px 0 0">${esc(B.lobbyMsg||"")}</p></div>
   <div class="label" style="margin-top:20px">열린 방 ${open.length?`<span class="muted">${open.length}</span>`:""}</div>
-  ${open.length?open.map(p=>{const h=p.presence.hosting;return `<button class="card study-entry" style="margin-top:8px" onclick="battleJoin('${esc(String(h.code||"")).replace(/[^A-Z0-9]/g,"")}')"><span class="ic" style="font-weight:900;font-size:15px">${esc(h.code)}</span><span class="sp" style="text-align:left"><b>${esc(cleanNick(h.nick)||"익명")}의 방</b><br><span class="xs muted">${esc(cfgLabel(h.cfg))} · ${Number(h.n)||1}명</span></span><span class="muted">참가 ›</span></button>`}).join(""):`<p class="sm muted">지금 열린 방이 없어요. 방을 만들고 친구에게 코드를 알려 주세요. 같은 페이지 링크로 들어와야 보여요.</p>`}`}`}`;
+  ${open.length?open.map(h=>{const code=String(h.code||"").replace(/[^A-Z0-9]/g,"").slice(0,4),n=clampInt(h.n,0,50,1),max=clampInt(h.max,2,50,8),full=n>=max,playing=h.status=="playing";
+    return `<button class="card study-entry" style="margin-top:8px" ${full?"disabled":""} onclick="battlePick('${code}',${h.lock?1:0})"><span class="ic" style="font-weight:900;font-size:14px">${esc(code)}</span><span class="sp" style="text-align:left;min-width:0"><b>${h.lock?"🔒 ":""}${esc(cleanTitle(h.title)||(cleanNick(h.nick)||"익명")+"의 방")}</b><br><span class="xs muted">${esc(cfgLabel(h.cfg))} · ${clampInt(h.qn,1,20,10)}문제 · ${clampInt(h.sec,5,60,20)}초 · ${n}/${max}명${playing?" · 진행 중":""}</span></span><span class="muted">${full?"가득 참":"참가 ›"}</span></button>`}).join("")
+   :`<p class="sm muted">지금 열린 방이 없어요. 방을 만들고 친구에게 코드를 알려 주세요.</p>`}`);
+  if(focus){const el=document.getElementById(focus);if(el){el.focus();if(el.setSelectionRange&&el.type!="password"&&el.type!="range")el.setSelectionRange(el.value.length,el.value.length)}}
 }
+function battlePick(code,lock){B.lobbyMsg="";B.pending={code,lock:!!lock};battleLobby();const c=$("#code");if(c)c.value=code;if(!lock)battleJoin();else $("#pw")?.focus()}
 function needNick(){if(cleanNick(nick).length<2){const m=$("#bmsg");if(m)m.textContent="닉네임을 2자 이상 입력해 주세요.";$("#nick")?.focus();return true}return false}
-async function battleCreate(){if(needNick())return;const code=Array.from({length:4},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.random()*32|0]).join("");await battleEnter(code,true)}
-async function battleJoin(raw){if(needNick())return;const code=String(raw||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,4);if(code.length!=4){$("#bmsg").textContent="4자리 코드를 입력해 주세요.";return}await battleEnter(code,false)}
-async function battleEnter(code,host){
-  try{const mr=await B.room.join("cg-"+code.toLowerCase());Object.assign(B,{mroom:mr,code,host,round:0,game:null,status:"lobby",ready:host,started:0,sawHost:false,hostGone:false});
-    B.unsub.push(mr.onPeers(ch=>{B.peers=ch.peers;onBattlePeers()}));
-    await mr.presence({nick:cleanNick(nick),role:host?"host":"guest",ready:host,status:"lobby",round:0,prog:0,score:0,res:""});
-    if(host){B.game={round:0,cfg:{...cfg},seed:0};await mr.presence({game:B.game});lobbyAdvert()}
-    B.view="room";battleRoom();
-  }catch(e){const m=$("#bmsg");if(m)m.textContent="방에 들어가지 못했어요. 잠시 후 다시 해 주세요."}
+
+/* ---- 방 만들기 / 설정 ---- */
+function battleForm(editing,keep){
+  if(!editing&&!keep&&needNick())return;
+  S=null;clearInterval(timer);app.classList.remove('fit');B.view="form";
+  let saved={};try{saved=JSON.parse(localStorage.getItem("cg_room")||"{}")}catch(e){}
+  const f=B.form=keep&&B.form?B.form:Object.assign({},BATTLE_DEFAULT,saved,editing&&B.game?{title:B.game.title,type:B.game.cfg.type,diff:B.game.cfg.diff,iv:B.game.cfg.iv,n:B.game.n,sec:B.game.sec,reveal:B.game.reveal,max:B.game.max,pub:B.game.pub,pw:B.pwPlain||""}:{});
+  f.pub=(f.pub===true||f.pub===1||f.pub==="1")?1:0;
+  const seg=(k,opts)=>`<div class="seg" style="grid-template-columns:repeat(${opts.length},1fr)">${opts.map(([v,lab])=>`<button type="button" class="${String(f[k])==String(v)?"on":""}" onclick="B.form.${k}=${typeof v=="number"?v:`'${v}'`};battleFormRedraw()">${lab}</button>`).join("")}</div>`;
+  app.innerHTML=topBack(editing?"방 설정 바꾸기":"방 만들기",editing?"battleRoom()":"battleLobby()")+`
+  <div class="card" style="padding:16px 16px 20px" id="bform">
+    <label class="label" for="ftitle" style="margin-top:0;display:block">방 이름 <span class="muted" style="font-weight:600">(선택)</span></label>
+    <input id="ftitle" class="inp" maxlength="24" placeholder="${esc(cleanNick(nick)||"나")}의 방" value="${esc(f.title)}" oninput="B.form.title=this.value">
+    <div class="label">문제 방식</div>${seg("type",[["choice4","4지선다"],["ox","O / X"],["draw","그리기"]])}
+    <div class="label">난이도</div>${seg("diff",[["easy","쉬움"],["normal","보통"],["hard","어려움"]])}
+    <div class="label">차트 단위</div>${seg("iv",[["day","일봉"],["week","주봉"]])}
+    <div class="label">문제 수</div>${seg("n",OPTS.n.map(v=>[v,v+"문제"]))}
+    <div class="label">문제당 제한 시간</div>${seg("sec",OPTS.sec.map(v=>[v,v+"초"]))}
+    <div class="label">정답 공개 시간 <span class="muted" style="font-weight:600">(모두 답한 뒤 다음 문제까지)</span></div>${seg("reveal",OPTS.reveal.map(v=>[v,v+"초"]))}
+    <div class="label">최대 인원 <b id="fmaxv" style="color:var(--ink)">${f.max}명</b></div>
+    <div class="row"><input id="fmax" type="range" min="2" max="50" step="1" value="${f.max}" style="flex:1;accent-color:var(--accent)" oninput="B.form.max=+this.value;$('#fmaxv').textContent=this.value+'명'"><span class="xs muted">2~50</span></div>
+    <label class="label" for="fpw" style="display:block">비밀번호 <span class="muted" style="font-weight:600">(선택, 4~12자)</span></label>
+    <input id="fpw" class="inp" maxlength="12" placeholder="비워 두면 누구나 참가" value="${esc(f.pw)}" oninput="B.form.pw=this.value">
+    <div class="label">열린 방 목록에 보이기</div>${seg("pub",[[1,"보이기"],[0,"숨기기 (코드로만 참가)"]].map(([v,l])=>[v,l]))}
+    <p id="fmsg" class="xs" style="color:var(--bad);margin:10px 0 0"></p>
+  </div>
+  <div style="margin-top:16px"><button class="cta" onclick="battleFormSubmit(${editing?1:0})">${editing?"설정 저장":"방 만들기"}</button></div>
+  <p class="xs muted" style="text-align:center;margin-top:10px;line-height:1.6">비밀번호는 다른 사람이 실수로 들어오는 걸 막는 용도예요. 공개 중계를 쓰기 때문에 보안 장치로 믿으면 안 돼요.</p>`;
 }
-function lobbyAdvert(){if(!B.room||!B.host)return;const n=B.peers.filter(p=>p.presence&&p.presence.nick).length||1;
-  B.room.presence({hosting:B.status=="left"?null:{code:B.code,nick:cleanNick(nick),cfg:B.game&&B.game.cfg,n,status:B.status=="lobby"||B.status=="result"?"lobby":"playing"}}).catch(()=>{})}
-function players(){return B.peers.filter(p=>p.kind=="viewer"&&p.presence&&p.presence.nick).map(p=>({peer:p.peer,me:p.sameTab,nick:cleanNick(p.presence.nick)||"익명",host:p.presence.role=="host",ready:!!p.presence.ready,status:String(p.presence.status||""),round:Number(p.presence.round)||0,prog:Math.min(Number(p.presence.prog)||0,10),score:Math.max(0,Number(p.presence.score)||0),res:String(p.presence.res||"").replace(/[^01]/g,"").slice(0,10),game:p.presence.game}))}
-function hostGame(){const h=players().find(p=>p.host&&p.game);return h?h.game:null}
+function battleFormRedraw(){const sy=scrollY;const t=$("#ftitle")?.value,pw=$("#fpw")?.value;if(t!=null)B.form.title=t;if(pw!=null)B.form.pw=pw;battleForm(!!B.mroom,true);scrollTo(0,sy)}
+async function battleFormSubmit(editing){
+  const f=B.form,pw=String(f.pw||"").trim();
+  if(pw&&(pw.length<4||pw.length>12)){$("#fmsg").textContent="비밀번호는 4~12자로 정해 주세요.";return}
+  const pub=f.pub===true||f.pub===1;
+  try{localStorage.setItem("cg_room",JSON.stringify({...f,pw:"",pub}))}catch(e){}
+  const settings={title:cleanTitle(f.title),cfg:{type:f.type,diff:f.diff,iv:f.iv},n:clampInt(f.n,5,20,10),sec:clampInt(f.sec,5,60,20),reveal:clampInt(f.reveal,2,15,5),max:clampInt(f.max,2,50,8),pub};
+  if(editing&&B.mroom){B.pwPlain=pw;B.game={...B.game,...settings,pwh:pw?await pwHash(B.code,pw):null};B.mroom.presence({game:B.game}).catch(()=>{});lobbyAdvert();battleRoom();return}
+  const code=Array.from({length:4},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.random()*32|0]).join("");
+  B.pwPlain=pw;await battleEnter(code,true,{...settings,pwh:pw?await pwHash(code,pw):null});
+}
+
+/* ---- 입장 ---- */
+async function battleJoin(){
+  if(needNick())return;
+  const code=String($("#code")?.value||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,4);
+  if(code.length!=4){$("#bmsg").textContent="4자리 코드를 입력해 주세요.";return}
+  const pw=String($("#pw")?.value||"");
+  B.pending={code,lock:!!(B.pending&&B.pending.code==code&&B.pending.lock)};
+  await battleEnter(code,false,null,pw);
+}
+async function battleEnter(code,host,settings,pw){
+  B.lobbyMsg="";const m=$("#bmsg")||$("#fmsg");if(m){m.style.color="var(--muted)";m.textContent="연결하는 중…"}
+  let mr;
+  try{mr=await B.room.join("cg-"+code.toLowerCase())}catch(e){if(m){m.style.color="var(--bad)";m.textContent="방에 들어가지 못했어요. 잠시 후 다시 해 주세요."}return}
+  Object.assign(B,{mroom:mr,code,host,round:0,game:null,status:"lobby",ready:host,sawHost:false,hostGone:false,joined:Date.now(),peers:[]});
+  B.unsub.push(mr.onPeers(ch=>{B.peers=ch.peers;onBattlePeers()}));
+  if(host){
+    B.game={round:0,seed:0,qi:0,phase:"lobby",...settings};
+    await mr.presence({nick:cleanNick(nick),role:"host",ready:true,status:"lobby",round:0,res:"",score:0,joined:B.joined,game:B.game});
+    lobbyAdvert();battleRoom();return;
+  }
+  // 참가자: 방장 정보를 받아서 비밀번호·인원을 확인한 뒤에 정식으로 들어간다
+  const g=await waitFor(()=>hostGame(),6000);
+  if(!g){await battleLeaveQuiet();battleLobby("방을 찾을 수 없어요. 코드를 확인해 주세요.");return}
+  if(g.pwh){
+    if(!pw){await battleLeaveQuiet();B.pending={code,lock:true};battleLobby("비밀번호가 걸린 방이에요. 비밀번호를 입력해 주세요.");$("#pw")?.focus();return}
+    if(await pwHash(code,pw)!==g.pwh){await battleLeaveQuiet();B.pending={code,lock:true};battleLobby("비밀번호가 맞지 않아요.");return}
+  }
+  const before=players().length;
+  if(before>=clampInt(g.max,2,50,8)){await battleLeaveQuiet();battleLobby("방이 가득 찼어요.");return}
+  await mr.presence({nick:cleanNick(nick),role:"guest",ready:false,status:"lobby",round:0,res:"",score:0,joined:B.joined});
+  // 동시에 여러 명이 들어와 정원을 넘으면 늦게 들어온 사람이 스스로 나간다
+  setTimeout(async()=>{if(!B.mroom)return;const ps=players().sort((a,b)=>a.joined-b.joined),idx=ps.findIndex(p=>p.me);
+    if(idx>=clampInt((hostGame()||g).max,2,50,8)){await battleLeaveQuiet();battleLobby("방이 가득 찼어요.")}},1500);
+  B.pending=null;B.game=g;
+  if(g.phase=="q")battleStartLocal(true);else battleRoom();
+}
+function waitFor(fn,ms){return new Promise(res=>{const t0=Date.now();(function poll(){const v=fn();if(v||Date.now()-t0>ms)return res(v||null);setTimeout(poll,150)})()})}
+function lobbyAdvert(){if(!B.room||!B.host)return;const g=B.game||{},n=players().length||1;
+  B.room.presence({hosting:B.status=="left"?null:{code:B.code,title:g.title||"",nick:cleanNick(nick),cfg:g.cfg,qn:g.n,sec:g.sec,max:g.max,n,lock:!!g.pwh,pub:g.pub!==false,status:g.phase=="q"?"playing":"lobby",ts:Date.now()}}).catch(()=>{})}
+setInterval(()=>{if(B.host&&B.mroom)lobbyAdvert()},15000);
+function players(){return B.peers.filter(p=>p.kind=="viewer"&&p.presence&&p.presence.nick).map(p=>({peer:p.peer,me:p.sameTab,nick:cleanNick(p.presence.nick)||"익명",host:p.presence.role=="host",ready:!!p.presence.ready,status:String(p.presence.status||""),round:Number(p.presence.round)||0,score:Math.max(0,Number(p.presence.score)||0),res:String(p.presence.res||"").replace(/[^01-]/g,"").slice(0,20),joined:Number(p.presence.joined)||0,game:p.presence.game}))}
+function hostGame(){const h=players().find(p=>p.host&&p.game&&typeof p.game=="object");return h?h.game:null}
+const roundPlayers=()=>players().filter(p=>p.round==B.round);
+
+/* ---- 방 상태 변화 ---- */
 function onBattlePeers(){
-  const g=hostGame();
-  if(!B.host&&g&&Number(g.round)>B.round&&Number(g.seed)){ // 방장이 새 라운드를 시작했다
-    B.round=Number(g.round);B.game=g;battleStartLocal();return}
-  // 방장을 한 번 본 뒤에 사라졌을 때만 '나갔다'고 본다 (막 들어온 순간에는 방장 정보가 아직 안 왔을 수 있다)
-  if(!B.host){const hostHere=players().some(p=>p.host);if(hostHere){B.sawHost=true;B.hostGone=false}else if(B.sawHost&&B.view=="room"){B.hostGone=true}}
-  if(B.host)lobbyAdvert();
-  if(B.view=="room")battleRoom();else if(B.view=="result")battleResultView();else if(S&&S.battle){const el=$("#bstrip");if(el)el.outerHTML=battleStrip()}
+  if(!B.host){
+    const hostHere=players().some(p=>p.host);if(hostHere){B.sawHost=true;B.hostGone=false}else if(B.sawHost){B.hostGone=true}
+    const g=hostGame();
+    if(g){
+      if(Number(g.round)>B.round&&g.phase=="q"&&Number(g.seed)){B.game=g;B.round=Number(g.round);battleStartLocal();return}
+      if(Number(g.round)==B.round&&B.round>0){B.game=g;followGame()}
+      else if(B.view=="room")B.game=g;
+    }
+  }else lobbyAdvert();
+  refreshBattleView();
 }
+function refreshBattleView(){
+  if(B.view=="room")battleRoom();else if(B.view=="result")battleResultView();
+  else if(S&&S.battle){const el=$("#bstrip");if(el)el.outerHTML=battleStrip();const w=$("#bwait");if(w)w.innerHTML=battleWaitHtml()}
+}
+// 방장이 문제를 넘기면 따라간다
+function followGame(){
+  const g=B.game;if(!S||!S.battle||S.battle.round!=B.round)return;
+  if(g.phase=="end"){if(B.view!="result"){if(!S.done)skipCurrent();battleFinish()}return}
+  const qi=clampInt(g.qi,0,S.list.length-1,0);
+  if(qi>S.i){if(!S.done)skipCurrent();S.i=qi;next()}
+}
+function skipCurrent(){clearInterval(timer);S.marks[S.i]=S.marks[S.i]=="-"?"0":S.marks[S.i];S.done=true;battleProgress()}
+
+/* ---- 대전방 화면 ---- */
 function battleRoom(){
   B.view="room";S=null;clearInterval(timer);app.classList.remove('fit');
-  const ps=players(),g=B.host?B.game:hostGame(),n=ps.length,allReady=ps.filter(p=>!p.host).every(p=>p.ready);
-  app.innerHTML=`<div class="row" style="margin:6px 0 10px"><button class="muted" style="font-size:22px;padding:4px 6px 4px 0" onclick="battleLeave();battleLobby()" aria-label="방 나가기">←</button><b style="font-size:20px">대전방</b><span class="sp"></span><span class="xs muted">${B.host?"방장":"참가자"}</span></div>
+  const ps=players().sort((a,b)=>a.joined-b.joined),g=B.host?B.game:(hostGame()||B.game),n=ps.length,max=g?clampInt(g.max,2,50,8):8,allReady=ps.filter(p=>!p.host).every(p=>p.ready);
+  const chips=g?[cfgLabel(g.cfg),`${g.n}문제`,`문제당 ${g.sec}초`,`공개 ${g.reveal}초`,g.pwh?"🔒 비밀번호":"",g.pub===false?"목록 숨김":""].filter(Boolean):[];
+  app.innerHTML=`<div class="row" style="margin:6px 0 10px"><button class="muted" style="font-size:22px;padding:4px 6px 4px 0" onclick="battleLeave();battleLobby()" aria-label="방 나가기">←</button><b style="font-size:20px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g&&g.title||"대전방")}</b><span class="sp"></span><span class="xs muted">${B.host?"방장":"참가자"}</span></div>
   <div class="card" style="padding:18px;text-align:center"><div class="xs muted">방 코드</div><div class="code tnum">${B.code}</div>
-    <div class="sm muted" style="margin-top:4px">${esc(cfgLabel(g&&g.cfg))||"방장 정보를 기다리는 중…"}</div>
-    <button class="ghost" style="margin-top:12px" onclick="copyCode()">코드 복사</button><p id="cmsg" class="xs muted" style="margin:6px 0 0"></p></div>
-  <div class="label" style="margin-top:18px">참가자 ${n}명</div>
-  <div class="card" style="overflow:hidden">${ps.map(p=>`<div class="pl"><span class="av">${esc(p.nick.slice(0,1))}</span><b class="sp">${esc(p.nick)}${p.me?` <span class="xs" style="color:var(--accent)">나</span>`:""}</b><span class="xs ${p.host||p.ready?"":"muted"}" style="${p.host||p.ready?"color:var(--good)":""}">${p.host?"방장":p.ready?"준비 완료":"대기 중"}</span></div>`).join("")||`<p class="sm muted" style="padding:14px">연결하는 중…</p>`}</div>
+    <div class="tags" style="justify-content:center;margin:10px 0 0">${chips.map(c=>`<span>${esc(c)}</span>`).join("")||`<span>방장 정보를 기다리는 중…</span>`}</div>
+    <div class="row" style="gap:8px;margin-top:12px"><button class="ghost" style="margin:0" onclick="copyCode()">코드 복사</button>${B.host?`<button class="ghost" style="margin:0" onclick="battleForm(true)">방 설정</button>`:""}</div><p id="cmsg" class="xs muted" style="margin:6px 0 0"></p></div>
+  <div class="label" style="margin-top:18px">참가자 <b style="color:var(--ink)">${n}</b> / ${max}</div>
+  <div class="card plgrid">${ps.map(p=>`<div class="pl"><span class="av">${esc(p.nick.slice(0,1))}</span><b class="sp" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.nick)}${p.me?` <span class="xs" style="color:var(--accent)">나</span>`:""}</b><span class="xs" style="color:${p.host||p.ready?"var(--good)":"var(--muted)"}">${p.host?"방장":p.ready?"준비":"대기"}</span></div>`).join("")||`<p class="sm muted" style="padding:14px">연결하는 중…</p>`}</div>
   ${B.hostGone?`<p class="sm" style="color:var(--bad)">방장이 나갔어요. 다른 방에 참가해 주세요.</p>`:""}
   ${window.__relay?`<p class="xs muted" style="margin:8px 2px 0">연결된 중계 서버 ${window.__relay()} · 서로 안 보이면 두 기기 모두 새로고침해 주세요</p>`:""}
-  <div style="margin-top:16px">${B.host?`<button class="cta" ${n<2||!allReady?"disabled":""} onclick="battleStart()">${n<2?"상대를 기다리는 중…":!allReady?"모두 준비하면 시작할 수 있어요":"대전 시작"}</button>
-    <p class="xs muted" style="text-align:center;margin-top:8px">조건을 바꾸려면 방을 나가 첫 화면에서 고른 뒤 다시 만드세요.</p>`
+  <div style="margin-top:16px">${B.host?`<button class="cta" ${n<2||!allReady?"disabled":""} onclick="battleStart()">${n<2?"상대를 기다리는 중…":!allReady?`모두 준비하면 시작할 수 있어요 (${ps.filter(p=>!p.host&&p.ready).length}/${n-1})`:"대전 시작"}</button>`
    :`<button class="cta" onclick="toggleReady()">${B.ready?"준비 취소":"준비"}</button><p class="xs muted" style="text-align:center;margin-top:8px">모두 준비하면 방장이 시작해요.</p>`}</div>`;
 }
 function copyCode(){const m=$("#cmsg");try{navigator.clipboard.writeText(B.code).then(()=>m.textContent="복사했어요.",()=>m.textContent="코드: "+B.code)}catch(e){m.textContent="코드: "+B.code}}
 function toggleReady(){B.ready=!B.ready;B.mroom.presence({ready:B.ready}).catch(()=>{});battleRoom()}
-function battleStart(){B.round+=1;B.game={round:B.round,cfg:B.game.cfg,seed:(Math.random()*2**31)|1};B.mroom.presence({game:B.game}).catch(()=>{});battleStartLocal()}
-function battleStartLocal(){
-  const g=B.game;cfg={...cfg,...g.cfg};B.status="playing";B.ready=false;
-  B.mroom.presence({status:"playing",round:B.round,prog:0,score:0,res:"",ready:false}).catch(()=>{});if(B.host)lobbyAdvert();
-  B.view="count";let n=3;const tick=()=>{if(B.view!="count")return;if(n==0){
-      rnd=mulberry(g.seed);const pool=Q.filter(q=>q.iv==g.cfg.iv&&q.d==g.cfg.diff);
-      S={list:pickList(pool),i:0,score:0,streak:0,res:[],battle:{seed:g.seed,round:B.round}};B.view=null;next();return}
-    app.innerHTML=`<div style="text-align:center;padding-top:30vh"><div class="xs muted">${esc(cfgLabel(g.cfg))}</div><div class="score" style="font-size:96px;margin-top:10px">${n}</div><div class="muted" style="margin-top:8px">모두 같은 문제로 시작해요</div></div>`;n--;setTimeout(tick,900)};tick();
+
+/* ---- 진행 ---- */
+function battleStart(){
+  B.round+=1;B.game={...B.game,round:B.round,seed:(Math.random()*2**31)|1,qi:0,phase:"q"};
+  B.qStart=Date.now();B.allDoneAt=0;B.mroom.presence({game:B.game}).catch(()=>{});lobbyAdvert();battleStartLocal();
 }
-function battleProgress(){if(!S||!S.battle||!B.mroom)return;B.mroom.presence({prog:S.res.length,score:S.score,res:S.res.map(r=>r.ok?1:0).join("")}).catch(()=>{})}
+function battleStartLocal(lateJoin){
+  const g=B.game;cfg={...cfg,...g.cfg};B.round=Number(g.round);B.status="playing";B.ready=false;
+  const pool=Q.filter(q=>q.iv==g.cfg.iv&&q.d==g.cfg.diff);rnd=mulberry(g.seed);
+  const list=pickList(pool,clampInt(g.n,1,20,10));
+  const begin=()=>{S={list,i:lateJoin?clampInt(g.qi,0,list.length-1,0):0,score:0,streak:0,res:[],marks:Array(list.length).fill("-"),battle:{seed:g.seed,round:B.round,sec:clampInt(g.sec,5,60,20)}};B.view=null;battleProgress();next();if(B.host)hostLoop()};
+  B.mroom.presence({status:"playing",round:B.round,res:"",score:0,ready:false}).catch(()=>{});
+  if(lateJoin){begin();return}
+  B.view="count";let n=3;const tick=()=>{if(B.view!="count")return;if(n==0){begin();return}
+    app.innerHTML=`<div style="text-align:center;padding-top:28vh"><div class="xs muted">${esc(gameInfo(g))}</div><div class="score" style="font-size:96px;margin-top:10px">${n}</div><div class="muted" style="margin-top:8px">모두 같은 문제로 시작해요</div></div>`;n--;setTimeout(tick,900)};tick();
+}
+// 방장만: 모두 답했거나 시간이 끝나면, 정답 공개 시간 뒤에 다음 문제로 넘긴다
+function hostLoop(){
+  clearInterval(B.loop);B.qStart=Date.now();B.allDoneAt=0;
+  B.loop=setInterval(()=>{
+    const g=B.game;if(!B.mroom||!g||g.phase!="q"){clearInterval(B.loop);return}
+    const ps=roundPlayers(),qi=g.qi,now=Date.now();
+    const allDone=ps.length>0&&ps.every(p=>p.res.length>qi&&p.res[qi]!="-");
+    const timeUp=now-B.qStart>g.sec*1000+1500;
+    if((allDone||timeUp)&&!B.allDoneAt)B.allDoneAt=now;
+    if(B.allDoneAt&&now-B.allDoneAt>=g.reveal*1000){
+      if(qi+1>=g.n)B.game={...g,phase:"end"};else B.game={...g,qi:qi+1};
+      B.qStart=now;B.allDoneAt=0;B.mroom.presence({game:B.game}).catch(()=>{});lobbyAdvert();
+      if(B.game.phase=="end"){clearInterval(B.loop);if(!S.done)skipCurrent();battleFinish()}else{if(!S.done)skipCurrent();S.i=B.game.qi;next()}
+    }
+    const w=$("#bwait");if(w)w.innerHTML=battleWaitHtml();
+  },400);
+}
+function battleProgress(){if(!S||!S.battle||!B.mroom)return;
+  const upto=S.done?S.i+1:S.i,res=S.marks.slice(0,upto).join("");
+  B.mroom.presence({res,score:S.score}).catch(()=>{});}
+function battleWaitHtml(){
+  if(!S||!S.battle)return "";
+  const ps=roundPlayers(),qi=S.i,done=ps.filter(p=>p.res.length>qi&&p.res[qi]!="-").length,all=ps.length;
+  const g=B.host?B.game:(hostGame()||B.game);
+  let sub=done>=all?"모두 답했어요. 잠시 후 다음 문제로 넘어가요.":`다른 사람을 기다리는 중… (${done}/${all}명 완료)`;
+  if(B.host&&B.allDoneAt){const left=Math.max(0,Math.ceil((g.reveal*1000-(Date.now()-B.allDoneAt))/1000));sub=`${qi+1>=g.n?"결과 공개":"다음 문제"}까지 ${left}초`}
+  if(B.hostGone)sub="방장이 나갔어요. 게임을 이어갈 수 없어요.";
+  return `<div class="waitbar"><b>${qi+1>=S.list.length?"마지막 문제":`${qi+1}번 문제 끝`}</b><span>${sub}</span>${B.hostGone?`<button class="ghost" style="margin:8px 0 0" onclick="battleLeave();battleLobby()">나가기</button>`:""}</div>`;
+}
 function battleStrip(){
-  const ps=players().filter(p=>p.round==B.round).sort((a,b)=>b.score-a.score);
-  return `<div id="bstrip" class="bstrip">${ps.map(p=>`<div class="bp${p.me?" me":""}"><b>${esc(p.nick)}</b><span class="tnum">${p.score.toLocaleString()}</span><span class="mini-dots">${Array.from({length:10},(_,i)=>`<i class="${i<p.res.length?(p.res[i]=="1"?"ok":"no"):""}"></i>`).join("")}</span></div>`).join("")}</div>`;
+  const ps=roundPlayers().sort((a,b)=>b.score-a.score),meIdx=ps.findIndex(p=>p.me),shown=ps.slice(0,4);
+  if(meIdx>=4)shown.push(ps[meIdx]);
+  const n=S?S.list.length:10;
+  return `<div id="bstrip" class="bstrip">${shown.map(p=>`<div class="bp${p.me?" me":""}"><b>${ps.indexOf(p)+1}. ${esc(p.nick)}</b><span class="tnum">${p.score.toLocaleString()}</span><span class="mini-dots">${Array.from({length:n},(_,i)=>`<i class="${p.res[i]=="1"?"ok":p.res[i]=="0"?"no":""}"></i>`).join("")}</span></div>`).join("")}${ps.length>shown.length?`<div class="bp more"><span class="xs muted">외 ${ps.length-shown.length}명</span></div>`:""}</div>`;
 }
-function battleFinish(){B.status="result";B.mroom&&B.mroom.presence({status:"done",prog:10,score:S.score,res:S.res.map(r=>r.ok?1:0).join("")}).catch(()=>{});if(B.host)lobbyAdvert();B.mine=S;battleResultView()}
+function battleFinish(){clearInterval(timer);B.status="result";B.mroom&&B.mroom.presence({status:"done",res:S.marks.join(""),score:S.score}).catch(()=>{});if(B.host)lobbyAdvert();B.mine=S;battleResultView()}
 function battleResultView(){
   B.view="result";clearInterval(timer);app.classList.remove('fit');
-  const ps=players().filter(p=>p.round==B.round).sort((a,b)=>b.score-a.score),allDone=ps.every(p=>p.status=="done"),me=ps.findIndex(p=>p.me);
-  const medal=i=>["🥇","🥈","🥉"][i]||`${i+1}위`;
-  app.innerHTML=`<div class="hero" style="text-align:center"><div class="muted sm">${esc(cfgLabel(B.game&&B.game.cfg))}</div>
-    <div class="score" style="margin-top:10px">${allDone?(me==0?"승리!":`${me+1}위`):"집계 중…"}</div>
-    <div class="muted" style="margin-top:6px">${allDone?"모두 끝났어요":"상대가 아직 풀고 있어요"}</div></div>
-  <div class="card" style="overflow:hidden">${ps.map((p,i)=>`<div class="pl${p.me?" mine":""}"><span style="width:34px;font-size:18px">${allDone?medal(i):(p.status=="done"?"✔︎":"…")}</span><b class="sp">${esc(p.nick)}${p.me?` <span class="xs" style="color:var(--accent)">나</span>`:""}<br><span class="mini-dots">${Array.from({length:10},(_,k)=>`<i class="${k<p.res.length?(p.res[k]=="1"?"ok":"no"):""}"></i>`).join("")}</span></b><b class="tnum" style="font-size:18px">${p.score.toLocaleString()}</b></div>`).join("")}</div>
-  <div style="margin-top:16px">${B.host?`<button class="cta" ${allDone?"":"disabled"} onclick="battleRematch()">${allDone?"한 판 더":"모두 끝나면 다시 할 수 있어요"}</button>`:`<p class="sm muted" style="text-align:center">방장이 '한 판 더'를 누르면 바로 시작해요.</p>`}
-  ${B.mine?`<button class="ghost" onclick="result()">내 문제별 결과 보기</button>`:""}<button class="ghost" onclick="battleLeave();battleLobby()">방 나가기</button></div>`;
+  const ps=roundPlayers().sort((a,b)=>b.score-a.score),me=ps.findIndex(p=>p.me),n=B.mine?B.mine.list.length:(B.game&&B.game.n)||10;
+  const medal=i=>["🥇","🥈","🥉"][i]||`${i+1}`;
+  app.innerHTML=`<div class="hero" style="text-align:center"><div class="muted sm">${esc(gameInfo(B.game))}</div>
+    <div class="score" style="margin-top:10px">${me==0?"우승!":me>0?`${me+1}위`:"결과"}</div>
+    <div class="muted" style="margin-top:6px">${ps.length}명 중 ${me+1}위 · ${(B.mine?B.mine.score:0).toLocaleString()}점</div></div>
+  <div class="card" style="overflow:hidden">${ps.map((p,i)=>`<div class="pl${p.me?" mine":""}"><span style="width:34px;font-size:${i<3?18:14}px;text-align:center" class="tnum">${medal(i)}</span><b class="sp" style="min-width:0">${esc(p.nick)}${p.me?` <span class="xs" style="color:var(--accent)">나</span>`:""}<br><span class="mini-dots">${Array.from({length:n},(_,k)=>`<i class="${p.res[k]=="1"?"ok":p.res[k]=="0"?"no":""}"></i>`).join("")}</span></b><b class="tnum" style="font-size:18px">${p.score.toLocaleString()}</b></div>`).join("")}</div>
+  <div style="margin-top:16px">${B.host?`<button class="cta" onclick="battleRematch()">한 판 더 (같은 설정)</button><button class="ghost" onclick="battleBackToRoom()">대기실로 · 설정 바꾸기</button>`:`<p class="sm muted" style="text-align:center">방장이 '한 판 더'를 누르면 바로 시작해요.</p>`}
+  ${B.mine?`<button class="ghost" onclick="result()">내 문제별 결과·해설 보기</button>`:""}<button class="ghost" onclick="battleLeave();battleLobby()">방 나가기</button></div>`;
 }
-function battleRematch(){B.mroom.presence({status:"lobby",ready:true}).catch(()=>{});battleStart()}
-function battleLeave(){B.status="left";if(B.host)lobbyAdvert();const mr=B.mroom;Object.assign(B,{mroom:null,code:null,host:false,round:0,game:null,peers:[],view:null,mine:null,hostGone:false,sawHost:false});if(mr)mr.leave().catch(()=>{})}
+function battleRematch(){battleStart()}
+function battleBackToRoom(){B.game={...B.game,phase:"lobby"};B.mroom.presence({game:B.game,status:"lobby"}).catch(()=>{});lobbyAdvert();battleRoom()}
+async function battleLeaveQuiet(){const mr=B.mroom;Object.assign(B,{mroom:null,code:null,host:false,round:0,game:null,peers:[],view:null,mine:null,hostGone:false,sawHost:false});if(mr)await mr.leave().catch(()=>{})}
+function battleLeave(){clearInterval(B.loop);B.status="left";if(B.host)lobbyAdvert();B.status="idle";battleLeaveQuiet()}
 
 /* ---------- 공부하기 ---------- */
 // 그림용 캔들: [시가, 고가, 저가, 종가]
@@ -692,7 +845,7 @@ function study(tab){
   <button class="cta" style="margin-top:4px" onclick="home()">문제 풀러 가기</button>`;
   window.scrollTo(0,0);
 }
-function copyRes(m,n){const t=`빈칸 차트 ${L[cfg.diff]}\n${m}\n${n}/10 · ${S.score}점`;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>$("#note").textContent="복사했어요.",()=>$("#note").textContent="복사하지 못했어요.")}
+function copyRes(m,n){const t=`빈칸 차트 ${L[cfg.diff]}\n${m}\n${n}/${S.res.length} · ${S.score}점`;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>$("#note").textContent="복사했어요.",()=>$("#note").textContent="복사하지 못했어요.")}
 addEventListener("keydown",e=>{if(!S||!S.q||e.metaKey||e.ctrlKey)return;if(S.done){if(e.key=="Enter")advance();return}
   if(cfg.type=="choice4"&&"1234".includes(e.key)&&e.key.length==1)pick(+e.key-1);else if(cfg.type=="choice4"&&e.key=="Enter"&&S.sel!=null)answer(S.sel);
   else if(cfg.type=="ox"&&/^[ox]$/i.test(e.key))answer(e.key.toUpperCase())});
