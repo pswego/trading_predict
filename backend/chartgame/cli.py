@@ -103,6 +103,14 @@ def recalibrate(min_plays: int = 30):
 
 
 @app.command()
+def standalone():
+    """서버가 /game 에서 서비스할 한 파일짜리 게임 페이지를 만든다."""
+    from .pipeline import standalone as s
+
+    typer.echo(s.write())
+
+
+@app.command()
 def serve(host: str = "0.0.0.0", port: int = 8000, reload: bool = False):
     """API + 웹 서버를 띄운다."""
     import uvicorn

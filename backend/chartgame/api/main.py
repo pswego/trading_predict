@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 
 from .. import config
 from ..db.session import get_engine
+from .battle import router as battle_router
 from .routes import router
 
 
@@ -32,12 +34,33 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="빈칸 차트", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
 app.include_router(router)
+app.include_router(battle_router)
+STATIC = Path(__file__).resolve().parents[1] / "static"
+
+
+@app.get("/static/{name}", include_in_schema=False)
+def static_file(name: str):
+    f = (STATIC / name).resolve()
+    if f.parent != STATIC.resolve() or not f.is_file():
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return FileResponse(f, headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/game", include_in_schema=False)
+def game_page():
+    """한 파일짜리 게임 (공부하기·자동 해설·그리기·온라인 대전 포함)."""
+    f = STATIC / "game.html"
+    if not f.is_file():
+        return JSONResponse({"detail": "게임 파일이 없어요. `chartgame standalone` 을 실행하세요."}, status_code=503)
+    return FileResponse(f, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/{path:path}", include_in_schema=False)
 def spa(path: str):
     if path.startswith("api/"):
         return JSONResponse({"detail": "Not Found"}, status_code=404)
+    if not path and os.environ.get("GAME_AT_ROOT") == "1" and (STATIC / "game.html").is_file():
+        return game_page()  # 배포판: 첫 화면을 한 파일짜리 게임으로
     dist = config.WEB_DIST
     f = (dist / path).resolve()
     if path and f.is_file() and dist.resolve() in f.parents:
