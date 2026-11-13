@@ -1,0 +1,112 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>빈칸 차트 테스트</title>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2733;--line:#2b3442;--ink:#e6edf3;--muted:#8b96a5;--up:#f0484e;--down:#4c8dff;--accent:#f2c94c;--good:#2fbf71;--bad:#ff8a3d}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f6f8;--panel:#fff;--panel2:#eef1f5;--line:#dce1e8;--ink:#1b1f24;--muted:#5f6b7a;--up:#e03131;--down:#1c6fe0;--good:#12894a;--bad:#d9480f}}
+:root[data-theme="dark"]{--bg:#0d1117}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:16px}
+button{font:inherit;cursor:pointer;color:inherit}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 14px;font-weight:600}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#1a1400}
+.btn{width:100%;border:0;border-radius:12px;padding:14px;font-weight:700;background:var(--accent);color:#1a1400;margin-top:12px}.btn:disabled{opacity:.4}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}@media(min-width:640px){.grid{grid-template-columns:repeat(4,1fr)}}
+.opt{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px}
+.opt.sel{outline:2px solid var(--accent)}.opt.real{outline:2px solid var(--good)}.opt.wrong{outline:2px solid var(--bad)}
+.num{position:absolute;left:6px;top:4px;font-size:12px;font-weight:700;background:var(--panel2);border-radius:6px;padding:1px 6px}
+.muted{color:var(--muted);font-size:13px}.row{display:flex;align-items:center;gap:10px}h1{margin:8px 0 4px}h3{margin:0 0 8px;font-size:14px}
+.ox{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.ox button{font-size:40px;font-weight:900;padding:20px;border-radius:16px;background:var(--panel)}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;text-align:center}.stat div{background:var(--panel2);border-radius:8px;padding:8px}
+.up{color:var(--up)}.dn{color:var(--down)}.bar{height:6px;background:var(--panel2);border-radius:9px;overflow:hidden;flex:1}.bar i{display:block;height:100%;background:var(--accent)}
+svg{display:block;width:100%;height:auto}
+</style></head><body><div class="wrap" id="app"></div>
+<script>const Q=__DATA__;</script>
+<script>
+const $=s=>document.querySelector(s), app=$("#app");
+const L={easy:"쉬움",normal:"보통",hard:"어려움",KOSPI:"코스피",KOSDAQ:"코스닥",large:"대형주",mid:"중형주",small:"소형주",micro:"초소형주",day:"일봉",week:"주봉"};
+const SRC={mirror:"실제 모양을 뒤집은 것",other_stock:"다른 종목의 실제 구간",other_stock_volatility_mismatch:"변동성이 다른 종목의 구간",same_market_cap_tier:"비슷한 규모 종목의 구간",same_stock_other_period:"같은 종목의 다른 시기",same_sector:"같은 업종 종목의 구간"};
+const LIM={choice4:{easy:25,normal:20,hard:20},ox:{easy:12,normal:10,hard:10}}, MUL={easy:1,normal:1.5,hard:2.5};
+let cfg={type:"choice4",diff:"normal",iv:"day"}, S;
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const seen=new Set(JSON.parse(localStorage.getItem("cg_seen")||"[]"));
+function chart(p,fill,{thumb=false,ghost=null,range=[],style=null}={}){
+  const {L:l,G:g,R:r}=p.layout,N=l+g+r,c=p.candles;let i0=0,i1=N;if(thumb){i0=Math.max(l-6,0);i1=Math.min(l+g+6,N)}
+  const W=thumb?200:800,H=thumb?124:(innerWidth<600?480:340),pr=thumb?2:46,vol=!thumb&&p.volume,pb=vol?H*.8:H-4;
+  const vis=[];for(let i=i0;i<i1;i++){if(i<l)vis.push([i,c[i]]);else if(i>=l+g)vis.push([i,c[i-g]])}
+  let lo=1e9,hi=-1e9;for(const grp of [vis.map(v=>v[1]),fill,ghost,...range])if(grp)for(const k of grp){lo=Math.min(lo,k[2]);hi=Math.max(hi,k[1])}
+  const pad=(hi-lo)*.06;lo-=pad;hi+=pad;const st=(W-pr-2)/(i1-i0),cx=i=>2+st*(i-i0+.5),y=v=>pb-(v-lo)/(hi-lo)*(pb-6),bw=Math.max(st*.7,1);
+  const cd=(k,x,op=1,anim="")=>{const u=k[3]>=k[0],col=u?"var(--up)":"var(--down)",t=y(Math.max(k[0],k[3])),h=Math.max(y(Math.min(k[0],k[3]))-t,1);return `<g opacity="${op}"${anim}><line x1="${x}" x2="${x}" y1="${y(k[1])}" y2="${y(k[2])}" stroke="${col}" stroke-width="${thumb?1:1.3}"/><rect x="${x-bw/2}" y="${t}" width="${bw}" height="${h}" fill="${col}"/></g>`};
+  let s=`<svg viewBox="0 0 ${W} ${H}">`;
+  const gx0=cx(l)-st/2,gx1=cx(l+g-1)+st/2;
+  if(!thumb){const span=(hi-lo)*100,step=[1,2,5,10,20,25,50,100,200,500].find(v=>span/v<=5)||1000;for(let pc=Math.ceil((lo-1)*100/step)*step;pc<=(hi-1)*100;pc+=step){const v=1+pc/100;s+=`<line x1="0" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${pc==0?'stroke-dasharray="4 4"':'opacity=".5"'}/><text x="${W-pr+5}" y="${y(v)+4}" font-size="11" fill="var(--muted)">${pc>0?"+":""}${pc}%</text>`}}
+  if(fill)s+=`<rect x="${gx0}" y="0" width="${gx1-gx0}" height="${H}" fill="${style=="real"?"var(--good)":"var(--accent)"}" opacity="${style?.1:0}"/>`;
+  else s+=`<rect x="${gx0}" y="0" width="${gx1-gx0}" height="${H}" fill="var(--panel2)"/><text x="${(gx0+gx1)/2}" y="${pb/2+10}" text-anchor="middle" font-size="${thumb?18:34}" font-weight="800" fill="var(--muted)">?</text>`;
+  for(const [i,k] of vis)s+=cd(k,cx(i),thumb?.45:1);
+  if(!thumb&&p.ma)for(const [key,arr] of Object.entries(p.ma))for(const [a,b,o] of [[0,l,0],[l,l+r,g]]){let d="";for(let i=a;i<b;i++)if(arr[i]!=null)d+=(d?"L":"M")+cx(i+o)+","+y(arr[i]);if(d)s+=`<path d="${d}" fill="none" stroke="${key=="5"?"#e0a100":"#b36bff"}" stroke-width="1.3"/>`}
+  if(ghost)ghost.forEach((k,j)=>s+=cd(k,cx(l+j),.28));
+  if(fill)fill.forEach((k,j)=>s+=cd(k,cx(l+j),1,style=="real"?` style="animation:fi .2s ${(j/g*.7).toFixed(2)}s both"`:""));
+  if(vol){const all=[...p.volume,...(fill&&p._fv?p._fv:[])],vm=Math.max(...all)||1,vy=v=>H-2-v/vm*(H-2-H*.84);p.volume.forEach((v,k)=>{const i=k<l?k:k+g,cc=c[k];s+=`<rect x="${cx(i)-bw/2}" y="${vy(v)}" width="${bw}" height="${H-2-vy(v)}" fill="${cc[3]>=cc[0]?"var(--up)":"var(--down)"}" opacity=".5"/>`})}
+  return s+"</svg>";
+}
+function home(){
+  const pool=Q.filter(q=>q.iv==cfg.iv&&q.d==cfg.diff),left=pool.filter(q=>!seen.has(q.r.code+q.r.gap_start)).length;
+  const ch=(k,v,t)=>`<button class="chip ${cfg[k]==v?"on":""}" onclick="cfg.${k}='${v}';home()">${t}</button>`;
+  app.innerHTML=`<h1>빈칸 차트</h1><p class="muted">실제 주식 차트의 가려진 구간, 진짜 모양을 맞혀 보세요. (테스트판 · 실제 문제 ${Q.length}개 수록)</p>
+  <div class="card"><h3>문제 방식</h3><div class="chips">${ch("type","choice4","4지선다")}${ch("type","ox","O / X")}</div>
+  <h3 style="margin-top:14px">난이도</h3><div class="chips">${ch("diff","easy","쉬움")}${ch("diff","normal","보통")}${ch("diff","hard","어려움")}</div>
+  <h3 style="margin-top:14px">차트 단위</h3><div class="chips">${ch("iv","day","일봉")}${ch("iv","week","주봉")}</div>
+  <p class="muted" style="margin-top:12px">이 조건 남은 문제 ${left} / ${pool.length}</p></div>
+  <button class="btn" onclick="start()">10문제 시작</button>
+  <p class="muted" style="text-align:center;margin-top:16px">과거 데이터 기반 오락용이며 투자 권유가 아닙니다. 가격 출처: 네이버 금융<br><button style="background:none;border:0;text-decoration:underline" class="muted" onclick="localStorage.removeItem('cg_seen');seen.clear();home()">푼 문제 기록 지우기</button></p>`;
+}
+function start(){
+  let pool=Q.filter(q=>q.iv==cfg.iv&&q.d==cfg.diff),fresh=pool.filter(q=>!seen.has(q.r.code+q.r.gap_start));if(fresh.length<10)fresh=pool;
+  const list=[],used=new Set();for(const q of shuffle(fresh)){if(used.has(q.r.code))continue;used.add(q.r.code);list.push(q);if(list.length==10)break}
+  S={list,i:0,score:0,streak:0,res:[]};next();
+}
+let timer;
+function next(){
+  const q=S.list[S.i];S.q=q;S.order=shuffle([0,1,2,3]);S.ox=Math.random()<.5?0:1+(Math.random()*3|0);S.sel=null;S.done=false;S.t0=performance.now();S.lim=LIM[cfg.type][q.d]*1000;render();
+  clearInterval(timer);timer=setInterval(()=>{const left=S.lim-(performance.now()-S.t0);const b=$("#tb");if(b)b.style.width=Math.max(left/S.lim*100,0)+"%";const t=$("#tt");if(t)t.textContent=Math.ceil(Math.max(left,0)/1000);if(left<=0)answer(null)},100);
+}
+function render(){
+  const q=S.q,p=q.p,o=p.options,ox=cfg.type=="ox";let fill=null,ghost=null,style=null;
+  if(S.done){style="real";fill=o[0];p._fv=p.option_volume?.[0];if(ox&&S.ox!==0)ghost=o[S.ox];if(!ox&&S.ans!=null&&S.order[S.ans]!==0)ghost=o[S.order[S.ans]]}
+  else if(ox){fill=o[S.ox];p._fv=p.option_volume?.[S.ox]}else if(S.sel!=null){fill=o[S.order[S.sel]];p._fv=p.option_volume?.[S.order[S.sel]]}
+  const rng=ox?[o[0],o[S.ox]]:o;
+  let h=`<div class="row"><button style="background:none;border:0;font-size:20px" class="muted" onclick="clearInterval(timer);home()">✕</button><b>${S.i+1} / 10</b><span style="flex:1"></span>${S.streak>=2?`<b style="color:var(--accent)">🔥 ${S.streak}</b>`:""}<b>${S.score.toLocaleString()}점</b></div>
+  <div class="row" style="margin:8px 0"><div class="bar"><i id="tb" style="width:100%"></i></div><span class="muted" id="tt"></span></div>
+  <div class="muted" style="margin-bottom:6px">${L[q.m]} · ${L[q.t]} · ${L[q.iv]} · ${L[q.d]}</div>
+  <div class="card" style="padding:6px">${chart(p,fill,{ghost,range:rng,style})}</div>`;
+  if(S.done){const r=q.r,ok=S.ok,pc=v=>`<b class="${v>0?"up":v<0?"dn":""}">${v>0?"+":""}${v.toFixed(1)}%</b>`;
+    h+=`<div class="card" style="margin-top:10px;border:2px solid ${ok?"var(--good)":"var(--bad)"}"><div class="row"><h2 style="margin:0;color:${ok?"var(--good)":"var(--bad)"}">${ok?"정답!":S.ans==null?"시간 초과":"아쉬워요"}</h2><span style="flex:1"></span><b>+${S.pts}점</b></div>
+    <p class="muted">${ox?(S.ox===0?"보여 드린 모양이 실제였어요.":"보여 드린 모양은 가짜였어요. 흐린 것이 가짜, 선명한 것이 실제예요."):(!ok&&S.ans!=null?"흐리게 겹친 것이 내가 고른 모양이에요.":"")}</p>
+    <b style="font-size:18px">${r.name}</b> <span class="muted">${r.code}</span><div class="muted">당시 ${L[r.cap_tier_then]} · 빈칸 ${r.gap_start} ~ ${r.gap_end}</div>
+    <div class="stat"><div><div class="muted">빈칸 수익률</div>${pc(r.gap_return_pct)}</div><div><div class="muted">빈칸 안 최고</div>${pc(r.gap_max_pct)}</div><div><div class="muted">빈칸 안 최저</div>${pc(r.gap_min_pct)}</div></div>
+    ${r.delisted?`<p class="muted">이 종목은 ${r.delisted.date}에 상장폐지됐어요 (${r.delisted.reason}).</p>`:""}</div>
+    <button class="btn" onclick="S.i++;S.i<10?next():result()">${S.i==9?"결과 보기":"다음 문제"}</button>`}
+  if(!ox){h+=`<div class="grid">`+S.order.map((k,i)=>{const cls=S.done?(k===0?"real":S.ans===i?"wrong":""):(S.sel===i?"sel":"");return `<div class="opt ${cls}" ${S.done?"":`onclick="pick(${i})"`}><span class="num">${i+1}</span>${chart(p,o[k],{thumb:true,range:o})}${S.done&&k!==0?`<div class="muted" style="font-size:11px;padding:2px">${SRC[q.r.decoy_sources[k-1]]||""}</div>`:""}</div>`}).join("")+`</div>`;
+    if(!S.done)h+=`<button class="btn" ${S.sel==null?"disabled":""} onclick="answer(S.sel)">${S.sel==null?"보기를 골라 주세요":(S.sel+1)+"번으로 확정"}</button>`}
+  else if(!S.done)h+=`<p style="text-align:center;font-weight:700">빈칸에 들어간 이 모양, 실제일까요?</p><div class="ox"><button style="border:2px solid var(--good);color:var(--good)" onclick="answer('O')">O</button><button style="border:2px solid var(--bad);color:var(--bad)" onclick="answer('X')">X</button></div>`;
+  app.innerHTML=h;
+}
+function pick(i){S.sel===i?answer(i):(S.sel=i,render())}
+function answer(c){
+  if(S.done)return;clearInterval(timer);const el=performance.now()-S.t0,q=S.q;
+  const ok=c!=null&&el<=S.lim+300&&(cfg.type=="ox"?(c=="O")==(S.ox===0):S.order[c]===0);
+  const base=100*MUL[q.d],pts=ok?Math.round((base+base*.5*Math.max(0,1-el/S.lim))*Math.min(1+.1*S.streak,2)*(cfg.type=="ox"?.5:1)):0;
+  S.done=true;S.ans=c;S.ok=ok;S.pts=pts;S.score+=pts;S.streak=ok?S.streak+1:0;S.res.push({ok,q,pts});
+  seen.add(q.r.code+q.r.gap_start);try{localStorage.setItem("cg_seen",JSON.stringify([...seen]))}catch(e){}
+  render();window.scrollTo(0,0);
+}
+function result(){
+  const n=S.res.filter(r=>r.ok).length,marks=S.res.map(r=>r.ok?"🟩":"🟥").join("");
+  app.innerHTML=`<h1>결과</h1><div class="card" style="text-align:center"><div class="muted">점수</div><div style="font-size:48px;font-weight:900">${S.score.toLocaleString()}</div><div style="font-size:22px">${marks}</div><p>${n} / 10 정답</p></div>
+  <div class="card" style="margin-top:10px">${S.res.map(r=>`<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)"><span>${r.ok?"🟩":"🟥"}</span><div style="flex:1"><b>${r.q.r.name}</b><div class="muted">${r.q.r.gap_start} ~ ${r.q.r.gap_end}</div></div><span class="${r.q.r.gap_return_pct>0?"up":"dn"}">${r.q.r.gap_return_pct>0?"+":""}${r.q.r.gap_return_pct}%</span><b style="width:44px;text-align:right">${r.pts}</b></div>`).join("")}</div>
+  <button class="btn" onclick="navigator.clipboard?.writeText('빈칸 차트 ${marks} ${n}/10 · ${S.score}점')">결과 복사</button><button class="btn" style="background:var(--panel2);color:var(--ink)" onclick="home()">처음으로</button>`;
+}
+document.head.insertAdjacentHTML("beforeend","<style>@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1}}</style>");
+addEventListener("keydown",e=>{if(!S||!S.q||!document.querySelector(".bar"))return;if(S.done&&e.key=="Enter"){S.i++;S.i<10?next():result();return}if(S.done)return;if(cfg.type=="choice4"&&"1234".includes(e.key)&&e.key)pick(+e.key-1);if(cfg.type=="ox"&&/^[ox]$/i.test(e.key))answer(e.key.toUpperCase())});
+home();
+</script></body></html>
