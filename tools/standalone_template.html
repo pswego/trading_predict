@@ -92,6 +92,10 @@ svg{display:block;width:100%;height:auto}
 /* 결과 */
 .nextbar{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 30%)}
 .nextbar>div{max-width:688px;margin:0 auto}
+.explain{margin-top:12px;padding:16px}.explain ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.explain li{display:flex;gap:8px;align-items:flex-start;font-size:14px;line-height:1.55}
+.tg{flex:none;font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;margin-top:2px}
+.ex-h{font-size:13px;font-weight:800;color:var(--muted);margin:14px 0 8px}
 .accbar{position:relative;height:10px;border-radius:9px;background:var(--panel2);margin-top:10px}
 .accbar i{display:block;height:100%;border-radius:9px}.accbar span{position:absolute;top:-4px;width:2px;height:18px;background:var(--ink);opacity:.6}
 .score{font-size:64px;font-weight:900;letter-spacing:-2px;line-height:1}
@@ -241,7 +245,8 @@ function render(){
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)"><b style="font-size:19px">${r.name}</b> <span class="sm muted">${r.code}</span>
       <div class="sm muted" style="margin-top:2px">당시 ${L[r.cap_tier_then]} · ${r.gap_start} ~ ${r.gap_end}</div></div>
       <div class="stats"><div><span class="xs muted">빈칸 수익률</span>${pc(r.gap_return_pct)}</div><div><span class="xs muted">구간 최고</span>${pc(r.gap_max_pct)}</div><div><span class="xs muted">구간 최저</span>${pc(r.gap_min_pct)}</div></div>
-      ${r.delisted?`<p class="xs muted" style="margin:10px 0 0">이 종목은 ${r.delisted.date}에 상장폐지됐어요 (${r.delisted.reason}).</p>`:""}</div>`}
+      ${r.delisted?`<p class="xs muted" style="margin:10px 0 0">이 종목은 ${r.delisted.date}에 상장폐지됐어요 (${r.delisted.reason}).</p>`:""}</div>
+    ${explainCard(q)}`}
 
   if(draw){
     if(!S.done){const cov=drawCoverage(S.drawn,q.p.layout.G);
@@ -265,6 +270,96 @@ function render(){
 }
 function pick(i){if(S.sel===i)answer(i);else{S.sel=i;render()}}
 function advance(){S.i++;S.i<10?next():result()}
+/* ---------- 자동 해설 ----------
+   정답 공개 때 차트 데이터를 규칙으로 분석해서 '문제를 풀 때 보였던 단서'와 '정답 근거'를 만든다. */
+const TAG={candle:["캔들","#e5484d"],trend:["추세","#3b82f6"],pattern:["패턴","#a855f7"],combo:["캔들 조합","#f59e0b"],vol:["변동성","#10b981"],volume:["거래량","#06b6d4"],gap:["갭","#ec4899"],option:["보기 비교","#64748b"]};
+function cinfo(k,prev){const [o,h,l,c]=k,rng=Math.max(h-l,1e-9),body=Math.abs(c-o);
+  return {up:c>=o,body:body/rng,upW:(h-Math.max(o,c))/rng,dnW:(Math.min(o,c)-l)/rng,ret:prev?c/prev-1:0,size:rng/(prev||o)}}
+const sd=a=>{const m=a.reduce((x,y)=>x+y,0)/a.length;return Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/Math.max(a.length-1,1))};
+const rets=cs=>cs.slice(1).map((k,i)=>Math.log(k[3]/cs[i][3]));
+function slopePct(cs){const n=cs.length;if(n<3)return 0;return (cs[n-1][3]/cs[0][3]-1)*100}
+const pct1=v=>(v>0?"+":"")+v.toFixed(1)+"%";
+function candleName(k,prev,size){const c=cinfo(k,prev);
+  if(c.body<.12&&c.upW>.25&&c.dnW>.25)return "도지(힘이 팽팽)";
+  if(c.dnW>.55&&c.body<.35)return "아래꼬리 긴 봉(망치형 계열)";
+  if(c.upW>.55&&c.body<.35)return "윗꼬리 긴 봉";
+  if(c.body>.7&&c.size>size*1.6)return c.up?"장대양봉":"장대음봉";
+  return null}
+function combos(cs,c0){ // cs: 연속 캔들 3개 이상, 끝 기준으로 조합 찾기
+  const out=[],n=cs.length;if(n<3)return out;const [a,b,c]=cs.slice(-3),I=x=>cinfo(x);
+  const up=x=>x[3]>x[0],big=x=>I(x).body>.55;
+  if(up(a)&&up(b)&&up(c)&&b[3]>a[3]&&c[3]>b[3]&&big(a)&&big(b)&&big(c))out.push("적삼병(양봉 3개 연속 상승)");
+  if(!up(a)&&!up(b)&&!up(c)&&b[3]<a[3]&&c[3]<b[3]&&big(a)&&big(b)&&big(c))out.push("흑삼병(음봉 3개 연속 하락)");
+  if(!up(b)&&up(c)&&c[3]>=b[0]&&c[0]<=b[3]&&Math.abs(c[3]-c[0])>Math.abs(b[3]-b[0])*1.2)out.push("상승 장악형");
+  if(up(b)&&!up(c)&&c[3]<=b[0]&&c[0]>=b[3]&&Math.abs(c[3]-c[0])>Math.abs(b[3]-b[0])*1.2)out.push("하락 장악형");
+  if(!up(a)&&big(a)&&I(b).body<.3&&up(c)&&big(c)&&c[3]>(a[0]+a[3])/2)out.push("샛별형");
+  if(up(a)&&big(a)&&I(b).body<.3&&!up(c)&&big(c)&&c[3]<(a[0]+a[3])/2)out.push("석별형");
+  return out}
+function analyze(q){
+  const p=q.p,{L:l,G:g,R:r}=p.layout,ctx=p.candles,left=ctx.slice(0,l),right=ctx.slice(l),real=p.options[0];
+  const c0=left[l-1][3],cEnd=real[g-1][3],full=[...left,...real,...right],clues=[],why=[],opts=[];
+  const sL=sd(rets(left))*100,sR=sd(rets(right))*100,sG=sd(rets([left[l-1],...real]))*100,sCtx=(sL+sR)/2;
+  const avgSize=a=>a.reduce((x,k,i)=>x+(k[1]-k[2])/(i?a[i-1][3]:k[0]),0)/a.length,szCtx=(avgSize(left)+avgSize(right))/2;
+  // 1) 양 끝 높이
+  const net=(cEnd/c0-1)*100;
+  clues.push(["trend",`빈칸 양 끝의 높이 차이는 <b>${pct1(net)}</b>예요. 모든 보기가 같은 곳에서 출발해 같은 곳에서 끝나니, 빈칸 전체로는 ${Math.abs(net)<2?"<b>제자리</b>로 돌아왔다는":net>0?"<b>올랐다</b>는":"<b>내렸다</b>는"} 것까지는 처음부터 알 수 있었어요.`]);
+  // 2) 추세
+  const tl=slopePct(left.slice(-12)),tr=slopePct(right.slice(0,12));
+  const word=v=>Math.abs(v)<4?"옆으로 기는 흐름":v>0?"상승 흐름":"하락 흐름";
+  clues.push(["trend",`빈칸 앞 12봉은 ${word(tl)}(${pct1(tl)}), 빈칸 뒤 12봉은 ${word(tr)}(${pct1(tr)})이었어요.`]);
+  // 3) 변동성
+  const vr=sG/Math.max(sCtx,1e-6);
+  clues.push(["vol",`양옆 캔들의 하루 평균 움직임은 약 ${sCtx.toFixed(1)}%예요. 실제 빈칸은 ${sG.toFixed(1)}%로 ${vr<.75?"<b>더 잠잠했어요</b>":vr>1.35?"<b>더 거칠었어요</b>":"<b>양옆과 비슷했어요</b>"}. ${vr>=.75&&vr<=1.35?"'변동성은 이어진다'는 경향대로예요.":"이런 경우는 변동성 단서만으로는 헷갈려요."}`]);
+  // 4) 경계 캔들 / 조합
+  const lastL=left[l-1],nm=candleName(lastL,left[l-2]&&left[l-2][3],szCtx);
+  if(nm)clues.push(["candle",`빈칸 바로 앞 캔들이 <b>${nm}</b>이었어요.${nm.startsWith("장대양")?" 큰 상승 뒤엔 살짝 되돌리는 경향이 있어요(데이터상 5일 평균 -0.4%).":nm.includes("망치")&&tl<0?" 하락 끝의 아래꼬리는 반등 신호로 봐요.":nm.includes("윗꼬리")&&tl>0?" 상승 끝의 윗꼬리는 힘이 빠지는 신호로 봐요.":""}`]);
+  combos(left.slice(-3)).forEach(cn=>clues.push(["combo",`빈칸 앞 3봉이 <b>${cn}</b> 모양이었어요.`]));
+  // 5) 갭
+  const g1=right[0][0]/cEnd-1;
+  if(Math.abs(g1)*100>Math.max(2*sCtx,3))clues.push(["gap",`빈칸 오른쪽 첫 캔들이 ${pct1(g1*100)} <b>갭</b>으로 시작했어요. 빈칸 마지막 종가와 오른쪽 시가가 벌어져 있다는 뜻이에요.`]);
+  // 6) 거래량
+  if(p.volume){const vL=p.volume.slice(0,l),vR=p.volume.slice(l),mean=[...vL,...vR].reduce((a,b)=>a+b,0)/(l+r);
+    const edge=Math.max(...vL.slice(-2),...vR.slice(0,2));
+    if(edge>mean*2.5)clues.push(["volume",`빈칸 바로 옆에서 <b>거래량이 평소의 ${(edge/mean).toFixed(1)}배</b>로 터졌어요. 거래량이 터진 근처는 캔들이 커지는 경향이 있어요.`]);}
+  // ---- 정답 근거: 실제 빈칸 경로 분석 ----
+  const closes=real.map(k=>k[3]),hi=Math.max(...real.map(k=>k[1])),lo=Math.min(...real.map(k=>k[2]));
+  const iMax=closes.indexOf(Math.max(...closes)),iMin=closes.indexOf(Math.min(...closes));
+  const upMove=(hi/c0-1)*100,dnMove=(lo/c0-1)*100,swing=upMove-dnMove;
+  const pre=left.slice(-10).map(k=>k[3]),post=right.slice(0,10).map(k=>k[3]);
+  const mid=(i,n)=>i>n*.2&&i<n*.8;
+  const pats=[];
+  if(mid(iMin,g)&&(Math.min(...closes)/c0-1)*100<-Math.max(5,2.5*sCtx)&&cEnd>Math.min(...closes)*1.04)pats.push(["V자 반등","빈칸 한가운데서 크게 빠졌다가 회복했어요"]);
+  if(mid(iMax,g)&&(Math.max(...closes)/c0-1)*100>Math.max(5,2.5*sCtx)&&cEnd<Math.max(...closes)*.96)pats.push(["급등 후 되돌림(역V)","빈칸 안에서 크게 올랐다가 상당 부분 반납했어요"]);
+  const boxL=Math.max(...pre)/Math.min(...pre)-1,boxG=hi/lo-1;
+  if(boxL<.08&&Math.abs(net)>Math.max(6,boxL*100*1.2)&&Math.abs(tl)<4)pats.push(["박스권 돌파",`좁은 박스(폭 ${(boxL*100).toFixed(0)}%)에서 쉬다가 빈칸에서 ${net>0?"위":"아래"}로 벗어났어요`]);
+  if(Math.abs(tl)>8&&boxG<Math.abs(tl)/100*.7&&Math.sign(tr||tl)===Math.sign(tl))pats.push([tl>0?"상승 깃발":"하락 깃발","급한 움직임 뒤 빈칸에서 좁게 쉬어 갔어요"]);
+  const lowsL=Math.min(...left.slice(-15).map(k=>k[2]));if(Math.abs(lo/lowsL-1)<.03&&iMin>0&&cEnd>lo*1.05&&tl<0)pats.push(["쌍바닥","빈칸 안 저점이 빈칸 앞 저점과 거의 같은 높이에서 받쳐졌어요"]);
+  const highsL=Math.max(...left.slice(-15).map(k=>k[1]));if(Math.abs(hi/highsL-1)<.03&&cEnd<hi*.95&&tl>0)pats.push(["쌍봉","빈칸 안 고점이 빈칸 앞 고점에서 다시 막혔어요"]);
+  if(!pats.length){const eff=Math.abs(net)/Math.max(swing,1e-6);
+    if(eff>.75&&Math.abs(net)>3)pats.push([net>0?"꾸준한 상승":"꾸준한 하락","빈칸 내내 한 방향으로 비교적 곧게 움직였어요"]);
+    else if(swing<Math.max(6,3*sCtx))pats.push(["횡보","빈칸 안에서 큰 방향 없이 좁게 오르내렸어요"]);
+    else pats.push(["출렁임",`빈칸 안에서 위로 ${pct1(upMove)}, 아래로 ${pct1(dnMove)}까지 흔들렸어요`]);}
+  pats.forEach(([n,d])=>why.push(["pattern",`실제 빈칸은 <b>${n}</b>에 가까워요. ${d}.`]));
+  why.push(["trend",`빈칸 안 최고 ${pct1(upMove)}, 최저 ${pct1(dnMove)}. ${iMax<iMin?"먼저 오르고 나중에 내렸어요.":"먼저 내리고 나중에 올랐어요."}`]);
+  const nmIn=real.map((k,i)=>candleName(k,i?real[i-1][3]:c0,szCtx)).filter(Boolean);
+  const big=nmIn.filter(x=>x.startsWith("장대"));if(big.length)why.push(["candle",`빈칸 안에 ${[...new Set(big)].join(", ")}이 ${big.length}개 있었어요.`]);
+  const cin=[];for(let i=2;i<g;i++)combos(real.slice(i-2,i+1)).forEach(x=>cin.push(x));if(cin.length)why.push(["combo",`빈칸 안에서 ${[...new Set(cin)].slice(0,2).join(", ")}이 나왔어요.`]);
+  // ---- 보기 비교: 오답이 왜 티 났는지 ----
+  p.options.slice(1).forEach((o,k)=>{const s=sd(rets([left[l-1],...o]))*100,ratio=s/Math.max(sCtx,1e-6),src=q.r.decoy_sources[k];
+    let why2=src=="mirror"?"실제 모양을 위아래로 뒤집은 것이라 흐름 방향이 정반대예요":ratio>1.5?`캔들 움직임이 양옆보다 ${ratio.toFixed(1)}배 커서 어색했어요`:ratio<.6?`캔들 움직임이 양옆의 ${ratio.toFixed(1)}배밖에 안 돼 너무 얌전했어요`:null;
+    opts.push([k+1,why2,SRC[src]||""])});
+  return {clues,why,opts};
+}
+function explainCard(q){
+  const a=analyze(q),li=([tg,txt])=>`<li><span class="tg" style="background:${TAG[tg][1]}22;color:${TAG[tg][1]}">${TAG[tg][0]}</span><span>${txt}</span></li>`;
+  const pos={};if(cfg.type=="choice4")S.order.forEach((k,i)=>pos[k]=i+1);
+  const opt=a.opts.map(([k,w,src])=>{const label=cfg.type=="choice4"?`${pos[k]}번 보기`:`가짜 보기 ${k}`;return w?li(["option",`<b>${label}</b>: ${w}.${src&&!w.startsWith("실제 모양을")?` (출처: ${src})`:""}`]):""}).join("");
+  return `<div class="card explain"><div class="row"><b style="font-size:17px">🔍 자동 해설</b><span class="sp"></span><span class="xs muted">차트 데이터로 자동 분석</span></div>
+  <div class="ex-h">문제에서 보였던 단서</div><ul>${a.clues.map(li).join("")}</ul>
+  <div class="ex-h">정답 근거</div><ul>${a.why.map(li).join("")}</ul>
+  ${opt?`<div class="ex-h">오답이 티 났던 점</div><ul>${opt}</ul>`:""}
+  <p class="xs muted" style="margin:10px 0 0">규칙으로 자동 찾은 단서라 틀릴 수 있어요. 자세한 설명은 <button class="xs" style="text-decoration:underline;color:var(--accent)" onclick="study('pattern')">패턴 사전</button>에 있어요.</p></div>`;
+}
 function answer(c){
   if(!S||S.done)return;clearInterval(timer);const el=performance.now()-S.t0,q=S.q;
   if(cfg.type=="draw"){
