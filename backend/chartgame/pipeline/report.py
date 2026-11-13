@@ -123,7 +123,7 @@ def write() -> str:
             out.append(f"\n### {title}\n\n" + _table(piv))
         combo = allq.groupby(["interval", "market", "cap_tier", "era", "difficulty"]).size().rename("n").reset_index()
         small = combo.sort_values("n").head(12).copy()
-        for c in ("interval", "market", "cap_tier", "difficulty"):
+        for c in ("interval", "market", "cap_tier", "era", "difficulty"):
             small[c] = small[c].map(LAB)
         small.columns = ["단위", "시장", "규모", "시기", "난이도", "문제 수"]
         out.append("\n### 가장 문제가 적은 조건 조합 (풀 고갈 위험)\n\n" + _table(small))
