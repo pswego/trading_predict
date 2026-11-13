@@ -10,3 +10,5 @@ web/dist/
 test-results/
 playwright-report/
 *.egg-info/
+hf_space/
+chartgap_hf_space.zip
