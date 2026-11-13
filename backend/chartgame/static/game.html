@@ -487,6 +487,7 @@ function battleRoom(){
   <div class="label" style="margin-top:18px">참가자 ${n}명</div>
   <div class="card" style="overflow:hidden">${ps.map(p=>`<div class="pl"><span class="av">${esc(p.nick.slice(0,1))}</span><b class="sp">${esc(p.nick)}${p.me?` <span class="xs" style="color:var(--accent)">나</span>`:""}</b><span class="xs ${p.host||p.ready?"":"muted"}" style="${p.host||p.ready?"color:var(--good)":""}">${p.host?"방장":p.ready?"준비 완료":"대기 중"}</span></div>`).join("")||`<p class="sm muted" style="padding:14px">연결하는 중…</p>`}</div>
   ${B.hostGone?`<p class="sm" style="color:var(--bad)">방장이 나갔어요. 다른 방에 참가해 주세요.</p>`:""}
+  ${window.__relay?`<p class="xs muted" style="margin:8px 2px 0">연결된 중계 서버 ${window.__relay()} · 서로 안 보이면 두 기기 모두 새로고침해 주세요</p>`:""}
   <div style="margin-top:16px">${B.host?`<button class="cta" ${n<2||!allReady?"disabled":""} onclick="battleStart()">${n<2?"상대를 기다리는 중…":!allReady?"모두 준비하면 시작할 수 있어요":"대전 시작"}</button>
     <p class="xs muted" style="text-align:center;margin-top:8px">조건을 바꾸려면 방을 나가 첫 화면에서 고른 뒤 다시 만드세요.</p>`
    :`<button class="cta" onclick="toggleReady()">${B.ready?"준비 취소":"준비"}</button><p class="xs muted" style="text-align:center;margin-top:8px">모두 준비하면 방장이 시작해요.</p>`}</div>`;
