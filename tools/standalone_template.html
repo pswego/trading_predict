@@ -1,112 +1,222 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>빈칸 차트 테스트</title>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>빈칸 차트</title>
 <style>
-:root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2733;--line:#2b3442;--ink:#e6edf3;--muted:#8b96a5;--up:#f0484e;--down:#4c8dff;--accent:#f2c94c;--good:#2fbf71;--bad:#ff8a3d}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f6f8;--panel:#fff;--panel2:#eef1f5;--line:#dce1e8;--ink:#1b1f24;--muted:#5f6b7a;--up:#e03131;--down:#1c6fe0;--good:#12894a;--bad:#d9480f}}
-:root[data-theme="dark"]{--bg:#0d1117}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
-.wrap{max-width:860px;margin:0 auto;padding:16px}
-button{font:inherit;cursor:pointer;color:inherit}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px}
-.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 14px;font-weight:600}
-.chip.on{background:var(--accent);border-color:var(--accent);color:#1a1400}
-.btn{width:100%;border:0;border-radius:12px;padding:14px;font-weight:700;background:var(--accent);color:#1a1400;margin-top:12px}.btn:disabled{opacity:.4}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}@media(min-width:640px){.grid{grid-template-columns:repeat(4,1fr)}}
-.opt{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px}
-.opt.sel{outline:2px solid var(--accent)}.opt.real{outline:2px solid var(--good)}.opt.wrong{outline:2px solid var(--bad)}
-.num{position:absolute;left:6px;top:4px;font-size:12px;font-weight:700;background:var(--panel2);border-radius:6px;padding:1px 6px}
-.muted{color:var(--muted);font-size:13px}.row{display:flex;align-items:center;gap:10px}h1{margin:8px 0 4px}h3{margin:0 0 8px;font-size:14px}
-.ox{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.ox button{font-size:40px;font-weight:900;padding:20px;border-radius:16px;background:var(--panel)}
-.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;text-align:center}.stat div{background:var(--panel2);border-radius:8px;padding:8px}
-.up{color:var(--up)}.dn{color:var(--down)}.bar{height:6px;background:var(--panel2);border-radius:9px;overflow:hidden;flex:1}.bar i{display:block;height:100%;background:var(--accent)}
+:root{
+  --bg:#0b0f17;--bg2:#111827;--panel:#151c28;--panel2:#1d2635;--line:#273244;--ink:#eef2f7;--muted:#8a96a8;
+  --up:#ff5a5f;--down:#4d8dff;--accent:#ffd34d;--accent-ink:#231a00;--good:#2fd07f;--bad:#ff8a3d;
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#f3f5f9;--bg2:#e9edf4;--panel:#ffffff;--panel2:#f1f4f8;--line:#e1e6ee;--ink:#151a22;--muted:#677386;
+  --up:#e5383b;--down:#1f6feb;--good:#11995a;--bad:#e8590c;--shadow:0 8px 24px rgba(20,30,50,.08);
+}}
+:root[data-theme="dark"]{--bg:#0b0f17}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(1200px 500px at 50% -200px,var(--bg2),var(--bg));color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 90px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
+.muted{color:var(--muted)}.sm{font-size:13px}.xs{font-size:12px}.b{font-weight:700}.tnum{font-variant-numeric:tabular-nums}
+.row{display:flex;align-items:center;gap:10px}.sp{flex:1}
+.up{color:var(--up)}.dn{color:var(--down)}
+
+/* 홈 */
+.hero{padding:28px 4px 18px}
+.logo{display:inline-flex;align-items:center;gap:10px;font-size:28px;font-weight:900;letter-spacing:-.5px}
+.logo i{width:34px;height:34px;border-radius:10px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-style:normal;font-size:18px}
+.seg{display:grid;gap:6px;background:var(--panel2);padding:5px;border-radius:14px}
+.seg button{padding:11px 6px;border-radius:10px;font-weight:700;color:var(--muted);transition:.15s}
+.seg button.on{background:var(--panel);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.label{font-size:13px;font-weight:700;margin:18px 0 8px;color:var(--muted)}
+.cta{width:100%;padding:17px;border-radius:16px;background:var(--accent);color:var(--accent-ink);font-size:17px;font-weight:800;
+  box-shadow:0 8px 20px rgba(255,211,77,.25);transition:transform .1s}
+.cta:active{transform:scale(.98)}.cta:disabled{opacity:.35;box-shadow:none}
+.ghost{width:100%;padding:15px;border-radius:16px;background:var(--panel2);font-weight:700;margin-top:10px}
+
+/* 플레이 */
+.top{position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 70%,transparent);padding:10px 0 12px;margin:-16px 0 0}
+.dots{display:flex;gap:5px;margin-top:10px}.dots i{flex:1;height:5px;border-radius:9px;background:var(--panel2)}
+.dots i.ok{background:var(--good)}.dots i.no{background:var(--bad)}.dots i.cur{background:var(--accent)}
+.timer{height:3px;border-radius:9px;background:var(--panel2);margin-top:8px;overflow:hidden}.timer i{display:block;height:100%;background:var(--muted);transition:width .1s linear}
+.timer i.hurry{background:var(--bad)}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px}.tags span{font-size:12px;padding:4px 9px;border-radius:8px;background:var(--panel2);color:var(--muted);font-weight:600}
+.main{padding:8px 6px 4px;overflow:hidden}
+.q{font-size:17px;font-weight:800;margin:18px 2px 10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt{position:relative;padding:8px 6px 6px;border-radius:18px;background:var(--panel);border:2px solid var(--line);transition:transform .12s,border-color .12s;text-align:left}
+.opt:active{transform:scale(.98)}
+.opt .n{position:absolute;left:10px;top:9px;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;background:var(--panel2);font-weight:800;font-size:13px}
+.opt.sel{border-color:var(--accent);box-shadow:0 0 0 4px rgba(255,211,77,.18)}.opt.sel .n{background:var(--accent);color:var(--accent-ink)}
+.opt.real{border-color:var(--good)}.opt.real .n{background:var(--good);color:#fff}
+.opt.wrong{border-color:var(--bad)}.opt.wrong .n{background:var(--bad);color:#fff}
+.opt.dim{opacity:.55}
+.badge{position:absolute;right:10px;top:9px;font-size:11px;font-weight:800;padding:3px 8px;border-radius:7px;color:#fff}
+.src{font-size:11px;color:var(--muted);padding:2px 6px 2px;line-height:1.3}
+.ox{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ox button{padding:22px 0;border-radius:20px;font-size:44px;font-weight:900;background:var(--panel);border:2px solid var(--line);transition:transform .1s}
+.ox button:active{transform:scale(.97)}
+.verdict{margin-top:12px;padding:16px;animation:pop .25s ease-out both}
+.verdict h2{margin:0;font-size:24px;font-weight:900}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.stats div{background:var(--panel2);border-radius:12px;padding:10px 4px;text-align:center}
+.stats b{display:block;font-size:17px;margin-top:2px}
+.bottom{position:sticky;bottom:0;padding:14px 0 6px;background:linear-gradient(transparent,var(--bg) 35%);margin-top:6px}
+@keyframes pop{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes shake{25%,75%{transform:translateX(-4px)}50%{transform:translateX(4px)}}
+.shake{animation:shake .3s}
 svg{display:block;width:100%;height:auto}
-</style></head><body><div class="wrap" id="app"></div>
+
+/* 결과 */
+.score{font-size:64px;font-weight:900;letter-spacing:-2px;line-height:1}
+.list div.item{display:flex;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
 <script>const Q=__DATA__;</script>
 <script>
 const $=s=>document.querySelector(s), app=$("#app");
 const L={easy:"쉬움",normal:"보통",hard:"어려움",KOSPI:"코스피",KOSDAQ:"코스닥",large:"대형주",mid:"중형주",small:"소형주",micro:"초소형주",day:"일봉",week:"주봉"};
-const SRC={mirror:"실제 모양을 뒤집은 것",other_stock:"다른 종목의 실제 구간",other_stock_volatility_mismatch:"변동성이 다른 종목의 구간",same_market_cap_tier:"비슷한 규모 종목의 구간",same_stock_other_period:"같은 종목의 다른 시기",same_sector:"같은 업종 종목의 구간"};
-const LIM={choice4:{easy:25,normal:20,hard:20},ox:{easy:12,normal:10,hard:10}}, MUL={easy:1,normal:1.5,hard:2.5};
-let cfg={type:"choice4",diff:"normal",iv:"day"}, S;
-const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const SRC={mirror:"실제 모양을 뒤집은 것",other_stock:"다른 종목의 구간",other_stock_volatility_mismatch:"변동성이 다른 종목",same_market_cap_tier:"비슷한 규모 종목의 구간",same_stock_other_period:"같은 종목의 다른 시기",same_sector:"같은 업종 종목의 구간"};
+const LIM={choice4:{easy:30,normal:25,hard:25},ox:{easy:15,normal:12,hard:12}}, MUL={easy:1,normal:1.5,hard:2.5};
+const ZOOM={main:14,thumb:3}; // 빈칸 양옆으로 보여 줄 봉 수 (확대)
+let cfg=Object.assign({type:"choice4",diff:"easy",iv:"day"},JSON.parse(localStorage.getItem("cg_cfg")||"{}")), S=null, timer=null;
 const seen=new Set(JSON.parse(localStorage.getItem("cg_seen")||"[]"));
-function chart(p,fill,{thumb=false,ghost=null,range=[],style=null}={}){
-  const {L:l,G:g,R:r}=p.layout,N=l+g+r,c=p.candles;let i0=0,i1=N;if(thumb){i0=Math.max(l-6,0);i1=Math.min(l+g+6,N)}
-  const W=thumb?200:800,H=thumb?124:(innerWidth<600?480:340),pr=thumb?2:46,vol=!thumb&&p.volume,pb=vol?H*.8:H-4;
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const save=()=>{try{localStorage.setItem("cg_cfg",JSON.stringify(cfg));localStorage.setItem("cg_seen",JSON.stringify([...seen]))}catch(e){}};
+const key=q=>q.r.code+q.r.gap_start;
+
+/* 차트: 빈칸 주변만 확대해서 그린다 */
+function chart(p,fill,o={}){
+  const {L:l,G:g,R:r}=p.layout,N=l+g+r,c=p.candles,thumb=!!o.thumb,side=thumb?ZOOM.thumb:ZOOM.main;
+  const i0=Math.max(l-side,0),i1=Math.min(l+g+side,N);
+  const W=thumb?220:720,H=thumb?150:(innerWidth<560?560:400),pr=thumb?4:(innerWidth<560?78:50),vol=!thumb&&p.volume;
+  const top=thumb?8:14,pb=vol?H*.78:H-8;
   const vis=[];for(let i=i0;i<i1;i++){if(i<l)vis.push([i,c[i]]);else if(i>=l+g)vis.push([i,c[i-g]])}
-  let lo=1e9,hi=-1e9;for(const grp of [vis.map(v=>v[1]),fill,ghost,...range])if(grp)for(const k of grp){lo=Math.min(lo,k[2]);hi=Math.max(hi,k[1])}
-  const pad=(hi-lo)*.06;lo-=pad;hi+=pad;const st=(W-pr-2)/(i1-i0),cx=i=>2+st*(i-i0+.5),y=v=>pb-(v-lo)/(hi-lo)*(pb-6),bw=Math.max(st*.7,1);
-  const cd=(k,x,op=1,anim="")=>{const u=k[3]>=k[0],col=u?"var(--up)":"var(--down)",t=y(Math.max(k[0],k[3])),h=Math.max(y(Math.min(k[0],k[3]))-t,1);return `<g opacity="${op}"${anim}><line x1="${x}" x2="${x}" y1="${y(k[1])}" y2="${y(k[2])}" stroke="${col}" stroke-width="${thumb?1:1.3}"/><rect x="${x-bw/2}" y="${t}" width="${bw}" height="${h}" fill="${col}"/></g>`};
-  let s=`<svg viewBox="0 0 ${W} ${H}">`;
+  let lo=1e9,hi=-1e9;for(const grp of [vis.map(v=>v[1]),fill,o.ghost,...(o.range||[])])if(grp)for(const k of grp){lo=Math.min(lo,k[2]);hi=Math.max(hi,k[1])}
+  const pad=(hi-lo)*.08;lo-=pad;hi+=pad;
+  const st=(W-pr-4)/(i1-i0),cx=i=>4+st*(i-i0+.5),y=v=>pb-(v-lo)/(hi-lo)*(pb-top),bw=Math.max(st*.62,1.5);
   const gx0=cx(l)-st/2,gx1=cx(l+g-1)+st/2;
-  if(!thumb){const span=(hi-lo)*100,step=[1,2,5,10,20,25,50,100,200,500].find(v=>span/v<=5)||1000;for(let pc=Math.ceil((lo-1)*100/step)*step;pc<=(hi-1)*100;pc+=step){const v=1+pc/100;s+=`<line x1="0" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${pc==0?'stroke-dasharray="4 4"':'opacity=".5"'}/><text x="${W-pr+5}" y="${y(v)+4}" font-size="11" fill="var(--muted)">${pc>0?"+":""}${pc}%</text>`}}
-  if(fill)s+=`<rect x="${gx0}" y="0" width="${gx1-gx0}" height="${H}" fill="${style=="real"?"var(--good)":"var(--accent)"}" opacity="${style?.1:0}"/>`;
-  else s+=`<rect x="${gx0}" y="0" width="${gx1-gx0}" height="${H}" fill="var(--panel2)"/><text x="${(gx0+gx1)/2}" y="${pb/2+10}" text-anchor="middle" font-size="${thumb?18:34}" font-weight="800" fill="var(--muted)">?</text>`;
-  for(const [i,k] of vis)s+=cd(k,cx(i),thumb?.45:1);
-  if(!thumb&&p.ma)for(const [key,arr] of Object.entries(p.ma))for(const [a,b,o] of [[0,l,0],[l,l+r,g]]){let d="";for(let i=a;i<b;i++)if(arr[i]!=null)d+=(d?"L":"M")+cx(i+o)+","+y(arr[i]);if(d)s+=`<path d="${d}" fill="none" stroke="${key=="5"?"#e0a100":"#b36bff"}" stroke-width="1.3"/>`}
-  if(ghost)ghost.forEach((k,j)=>s+=cd(k,cx(l+j),.28));
-  if(fill)fill.forEach((k,j)=>s+=cd(k,cx(l+j),1,style=="real"?` style="animation:fi .2s ${(j/g*.7).toFixed(2)}s both"`:""));
-  if(vol){const all=[...p.volume,...(fill&&p._fv?p._fv:[])],vm=Math.max(...all)||1,vy=v=>H-2-v/vm*(H-2-H*.84);p.volume.forEach((v,k)=>{const i=k<l?k:k+g,cc=c[k];s+=`<rect x="${cx(i)-bw/2}" y="${vy(v)}" width="${bw}" height="${H-2-vy(v)}" fill="${cc[3]>=cc[0]?"var(--up)":"var(--down)"}" opacity=".5"/>`})}
+  const cd=(k,x,op=1,extra="")=>{const u=k[3]>=k[0],col=u?"var(--up)":"var(--down)",t=y(Math.max(k[0],k[3])),h=Math.max(y(Math.min(k[0],k[3]))-t,1.2);
+    return `<g opacity="${op}"${extra}><line x1="${x}" x2="${x}" y1="${y(k[1])}" y2="${y(k[2])}" stroke="${col}" stroke-width="${thumb?1.4:1.8}" stroke-linecap="round"/><rect x="${x-bw/2}" y="${t}" width="${bw}" height="${h}" rx="${bw>6?1.5:0}" fill="${col}"/></g>`};
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${thumb?"보기 차트":"가운데가 가려진 차트"}">
+  <defs><pattern id="h${o.id||0}" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="var(--panel2)"/><line x1="0" y1="0" x2="0" y2="10" stroke="var(--line)" stroke-width="4"/></pattern></defs>`;
+  if(!thumb){const span=(hi-lo)*100,step=[1,2,5,10,20,25,50,100].find(v=>span/v<=5)||200;
+    for(let pc=Math.ceil((lo-1)*100/step)*step;pc<=(hi-1)*100;pc+=step){const v=1+pc/100;
+      s+=`<line x1="0" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${pc==0?'stroke-dasharray="5 5"':'opacity=".55"'}/><text x="${W-pr+6}" y="${y(v)+4}" font-size="${innerWidth<560?20:12}" font-weight="600" fill="var(--muted)">${pc>0?"+":""}${pc}%</text>`}}
+  if(fill){const col=o.style=="real"?"var(--good)":"var(--accent)";s+=`<rect x="${gx0}" y="0" width="${gx1-gx0}" height="${H}" fill="${col}" opacity="${thumb?0.06:0.09}" rx="8"/>`}
+  else s+=`<rect x="${gx0}" y="2" width="${gx1-gx0}" height="${H-4}" fill="url(#h${o.id||0})" rx="10"/><circle cx="${(gx0+gx1)/2}" cy="${pb/2+top/2}" r="${thumb?14:28}" fill="var(--panel)"/><text x="${(gx0+gx1)/2}" y="${pb/2+top/2+(thumb?6:12)}" text-anchor="middle" font-size="${thumb?17:34}" font-weight="900" fill="var(--muted)">?</text>`;
+  if(!thumb)s+=`<line x1="${gx0}" x2="${gx0}" y1="0" y2="${H}" stroke="var(--muted)" stroke-dasharray="3 4" opacity=".5"/><line x1="${gx1}" x2="${gx1}" y1="0" y2="${H}" stroke="var(--muted)" stroke-dasharray="3 4" opacity=".5"/>`;
+  for(const [i,k] of vis)s+=cd(k,cx(i),thumb?.35:1);
+  if(o.ghost)o.ghost.forEach((k,j)=>s+=cd(k,cx(l+j),.25));
+  if(fill)fill.forEach((k,j)=>s+=cd(k,cx(l+j),1,o.style=="real"?` style="animation:fi .22s ${(j/g*.6).toFixed(2)}s both"`:""));
+  if(vol){const fv=fill?o.fillVol:null,vals=[...vis.map(([i])=>p.volume[i<l?i:i-g]),...(fv||[])],vm=Math.max(...vals)||1,vy=v=>H-2-v/vm*(H-2-H*.82);
+    for(const [i,k] of vis){const v=p.volume[i<l?i:i-g];s+=`<rect x="${cx(i)-bw/2}" y="${vy(v)}" width="${bw}" height="${H-2-vy(v)}" rx="1" fill="${k[3]>=k[0]?"var(--up)":"var(--down)"}" opacity=".35"/>`}
+    if(fv)fv.forEach((v,j)=>{const k=fill[j];s+=`<rect x="${cx(l+j)-bw/2}" y="${vy(v)}" width="${bw}" height="${H-2-vy(v)}" rx="1" fill="${k[3]>=k[0]?"var(--up)":"var(--down)"}" opacity=".35"/>`})}
   return s+"</svg>";
 }
+
 function home(){
-  const pool=Q.filter(q=>q.iv==cfg.iv&&q.d==cfg.diff),left=pool.filter(q=>!seen.has(q.r.code+q.r.gap_start)).length;
-  const ch=(k,v,t)=>`<button class="chip ${cfg[k]==v?"on":""}" onclick="cfg.${k}='${v}';home()">${t}</button>`;
-  app.innerHTML=`<h1>빈칸 차트</h1><p class="muted">실제 주식 차트의 가려진 구간, 진짜 모양을 맞혀 보세요. (테스트판 · 실제 문제 ${Q.length}개 수록)</p>
-  <div class="card"><h3>문제 방식</h3><div class="chips">${ch("type","choice4","4지선다")}${ch("type","ox","O / X")}</div>
-  <h3 style="margin-top:14px">난이도</h3><div class="chips">${ch("diff","easy","쉬움")}${ch("diff","normal","보통")}${ch("diff","hard","어려움")}</div>
-  <h3 style="margin-top:14px">차트 단위</h3><div class="chips">${ch("iv","day","일봉")}${ch("iv","week","주봉")}</div>
-  <p class="muted" style="margin-top:12px">이 조건 남은 문제 ${left} / ${pool.length}</p></div>
-  <button class="btn" onclick="start()">10문제 시작</button>
-  <p class="muted" style="text-align:center;margin-top:16px">과거 데이터 기반 오락용이며 투자 권유가 아닙니다. 가격 출처: 네이버 금융<br><button style="background:none;border:0;text-decoration:underline" class="muted" onclick="localStorage.removeItem('cg_seen');seen.clear();home()">푼 문제 기록 지우기</button></p>`;
+  S=null;clearInterval(timer);
+  const pool=Q.filter(q=>q.iv==cfg.iv&&q.d==cfg.diff),left=pool.filter(q=>!seen.has(key(q))).length;
+  const seg=(k,opts)=>`<div class="seg" style="grid-template-columns:repeat(${opts.length},1fr)">${opts.map(([v,t])=>`<button class="${cfg[k]==v?"on":""}" onclick="cfg.${k}='${v}';save();home()">${t}</button>`).join("")}</div>`;
+  app.innerHTML=`<div class="hero"><div class="logo"><i>?</i>빈칸 차트</div>
+  <p class="muted" style="margin:10px 2px 0;line-height:1.5">실제 주식 차트의 가려진 구간,<br>진짜로 이어진 모양을 맞혀 보세요.</p></div>
+  <div class="card" style="padding:18px 16px 20px">
+    <div class="label" style="margin-top:0">문제 방식</div>${seg("type",[["choice4","4지선다"],["ox","O / X"]])}
+    <div class="label">난이도</div>${seg("diff",[["easy","쉬움"],["normal","보통"],["hard","어려움"]])}
+    <div class="label">차트 단위</div>${seg("iv",[["day","일봉"],["week","주봉"]])}
+    <div class="row xs muted" style="margin-top:16px"><span>이 조건 남은 문제</span><span class="sp"></span><b class="tnum" style="color:var(--ink)">${left}</b>&nbsp;/ ${pool.length}</div>
+  </div>
+  <div style="margin-top:16px"><button class="cta" onclick="start()">10문제 시작</button></div>
+  <p class="xs muted" style="text-align:center;margin-top:22px;line-height:1.7">테스트판 · 실제 문제 ${Q.length}개 수록<br>과거 데이터 기반 오락용이며 투자 권유가 아닙니다 · 가격 출처: 네이버 금융<br>
+  <button class="xs muted" style="text-decoration:underline" onclick="seen.clear();save();home()">푼 문제 기록 지우기</button></p>`;
 }
+
 function start(){
-  let pool=Q.filter(q=>q.iv==cfg.iv&&q.d==cfg.diff),fresh=pool.filter(q=>!seen.has(q.r.code+q.r.gap_start));if(fresh.length<10)fresh=pool;
+  const pool=Q.filter(q=>q.iv==cfg.iv&&q.d==cfg.diff);let fresh=pool.filter(q=>!seen.has(key(q)));if(fresh.length<10)fresh=pool;
   const list=[],used=new Set();for(const q of shuffle(fresh)){if(used.has(q.r.code))continue;used.add(q.r.code);list.push(q);if(list.length==10)break}
   S={list,i:0,score:0,streak:0,res:[]};next();
 }
-let timer;
+
 function next(){
-  const q=S.list[S.i];S.q=q;S.order=shuffle([0,1,2,3]);S.ox=Math.random()<.5?0:1+(Math.random()*3|0);S.sel=null;S.done=false;S.t0=performance.now();S.lim=LIM[cfg.type][q.d]*1000;render();
-  clearInterval(timer);timer=setInterval(()=>{const left=S.lim-(performance.now()-S.t0);const b=$("#tb");if(b)b.style.width=Math.max(left/S.lim*100,0)+"%";const t=$("#tt");if(t)t.textContent=Math.ceil(Math.max(left,0)/1000);if(left<=0)answer(null)},100);
+  const q=S.list[S.i];Object.assign(S,{q,order:shuffle([0,1,2,3]),ox:Math.random()<.5?0:1+(Math.random()*3|0),sel:null,done:false,t0:performance.now(),lim:LIM[cfg.type][q.d]*1000});
+  render();window.scrollTo(0,0);clearInterval(timer);
+  timer=setInterval(()=>{const left=S.lim-(performance.now()-S.t0),b=$("#tb");if(b){b.style.width=Math.max(left/S.lim*100,0)+"%";b.classList.toggle("hurry",left<5000)}if(left<=0)answer(null)},100);
 }
+
 function render(){
-  const q=S.q,p=q.p,o=p.options,ox=cfg.type=="ox";let fill=null,ghost=null,style=null;
-  if(S.done){style="real";fill=o[0];p._fv=p.option_volume?.[0];if(ox&&S.ox!==0)ghost=o[S.ox];if(!ox&&S.ans!=null&&S.order[S.ans]!==0)ghost=o[S.order[S.ans]]}
-  else if(ox){fill=o[S.ox];p._fv=p.option_volume?.[S.ox]}else if(S.sel!=null){fill=o[S.order[S.sel]];p._fv=p.option_volume?.[S.order[S.sel]]}
-  const rng=ox?[o[0],o[S.ox]]:o;
-  let h=`<div class="row"><button style="background:none;border:0;font-size:20px" class="muted" onclick="clearInterval(timer);home()">✕</button><b>${S.i+1} / 10</b><span style="flex:1"></span>${S.streak>=2?`<b style="color:var(--accent)">🔥 ${S.streak}</b>`:""}<b>${S.score.toLocaleString()}점</b></div>
-  <div class="row" style="margin:8px 0"><div class="bar"><i id="tb" style="width:100%"></i></div><span class="muted" id="tt"></span></div>
-  <div class="muted" style="margin-bottom:6px">${L[q.m]} · ${L[q.t]} · ${L[q.iv]} · ${L[q.d]}</div>
-  <div class="card" style="padding:6px">${chart(p,fill,{ghost,range:rng,style})}</div>`;
+  const q=S.q,p=q.p,o=p.options,ox=cfg.type=="ox",ov=p.option_volume;
+  let fill=null,fillVol=null,ghost=null,style=null;
+  if(S.done){style="real";fill=o[0];fillVol=ov&&ov[0];
+    if(ox&&S.ox!==0)ghost=o[S.ox];if(!ox&&S.ans!=null&&S.order[S.ans]!==0)ghost=o[S.order[S.ans]]}
+  else if(ox){fill=o[S.ox];fillVol=ov&&ov[S.ox]}
+  else if(S.sel!=null){fill=o[S.order[S.sel]];fillVol=ov&&ov[S.order[S.sel]]}
+  const range=ox?[o[0],o[S.ox]]:o;
+  const dots=Array.from({length:10},(_,i)=>`<i class="${i<S.res.length?(S.res[i].ok?"ok":"no"):i==S.i?"cur":""}"></i>`).join("");
+  let h=`<div class="top"><div class="row"><button aria-label="그만하기" class="muted" style="font-size:22px;padding:4px 6px 4px 0" onclick="home()">✕</button>
+    <b class="tnum">${S.i+1}<span class="muted"> / 10</span></b><span class="sp"></span>${S.streak>=2?`<b style="color:var(--accent)">🔥 ${S.streak}</b>`:""}<b class="tnum">${S.score.toLocaleString()}점</b></div>
+    <div class="dots">${dots}</div>${S.done?"":`<div class="timer"><i id="tb" style="width:100%"></i></div>`}</div>
+  <div class="tags"><span>${L[q.m]}</span><span>${L[q.t]}</span><span>${L[q.iv]}</span><span>${L[q.d]}</span></div>
+  <div class="card main">${chart(p,fill,{ghost,range,style,fillVol,id:9})}</div>`;
+
   if(S.done){const r=q.r,ok=S.ok,pc=v=>`<b class="${v>0?"up":v<0?"dn":""}">${v>0?"+":""}${v.toFixed(1)}%</b>`;
-    h+=`<div class="card" style="margin-top:10px;border:2px solid ${ok?"var(--good)":"var(--bad)"}"><div class="row"><h2 style="margin:0;color:${ok?"var(--good)":"var(--bad)"}">${ok?"정답!":S.ans==null?"시간 초과":"아쉬워요"}</h2><span style="flex:1"></span><b>+${S.pts}점</b></div>
-    <p class="muted">${ox?(S.ox===0?"보여 드린 모양이 실제였어요.":"보여 드린 모양은 가짜였어요. 흐린 것이 가짜, 선명한 것이 실제예요."):(!ok&&S.ans!=null?"흐리게 겹친 것이 내가 고른 모양이에요.":"")}</p>
-    <b style="font-size:18px">${r.name}</b> <span class="muted">${r.code}</span><div class="muted">당시 ${L[r.cap_tier_then]} · 빈칸 ${r.gap_start} ~ ${r.gap_end}</div>
-    <div class="stat"><div><div class="muted">빈칸 수익률</div>${pc(r.gap_return_pct)}</div><div><div class="muted">빈칸 안 최고</div>${pc(r.gap_max_pct)}</div><div><div class="muted">빈칸 안 최저</div>${pc(r.gap_min_pct)}</div></div>
-    ${r.delisted?`<p class="muted">이 종목은 ${r.delisted.date}에 상장폐지됐어요 (${r.delisted.reason}).</p>`:""}</div>
-    <button class="btn" onclick="S.i++;S.i<10?next():result()">${S.i==9?"결과 보기":"다음 문제"}</button>`}
-  if(!ox){h+=`<div class="grid">`+S.order.map((k,i)=>{const cls=S.done?(k===0?"real":S.ans===i?"wrong":""):(S.sel===i?"sel":"");return `<div class="opt ${cls}" ${S.done?"":`onclick="pick(${i})"`}><span class="num">${i+1}</span>${chart(p,o[k],{thumb:true,range:o})}${S.done&&k!==0?`<div class="muted" style="font-size:11px;padding:2px">${SRC[q.r.decoy_sources[k-1]]||""}</div>`:""}</div>`}).join("")+`</div>`;
-    if(!S.done)h+=`<button class="btn" ${S.sel==null?"disabled":""} onclick="answer(S.sel)">${S.sel==null?"보기를 골라 주세요":(S.sel+1)+"번으로 확정"}</button>`}
-  else if(!S.done)h+=`<p style="text-align:center;font-weight:700">빈칸에 들어간 이 모양, 실제일까요?</p><div class="ox"><button style="border:2px solid var(--good);color:var(--good)" onclick="answer('O')">O</button><button style="border:2px solid var(--bad);color:var(--bad)" onclick="answer('X')">X</button></div>`;
+    const sub=ox?(S.ox===0?"보여 드린 모양이 실제였어요.":"보여 드린 모양은 가짜였어요. 흐린 것이 가짜, 선명한 것이 실제예요."):(!ok&&S.ans!=null?"흐리게 겹친 것이 내가 고른 모양이에요.":"");
+    h+=`<div class="card verdict ${ok?"":"shake"}" style="border:2px solid ${ok?"var(--good)":"var(--bad)"}">
+      <div class="row"><h2 style="color:${ok?"var(--good)":"var(--bad)"}">${ok?"정답!":S.ans==null?"시간 초과":"아쉬워요"}</h2><span class="sp"></span><b class="tnum" style="font-size:18px">+${S.pts}</b></div>
+      ${sub?`<p class="sm muted" style="margin:6px 0 0">${sub}</p>`:""}
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)"><b style="font-size:19px">${r.name}</b> <span class="sm muted">${r.code}</span>
+      <div class="sm muted" style="margin-top:2px">당시 ${L[r.cap_tier_then]} · ${r.gap_start} ~ ${r.gap_end}</div></div>
+      <div class="stats"><div><span class="xs muted">빈칸 수익률</span>${pc(r.gap_return_pct)}</div><div><span class="xs muted">구간 최고</span>${pc(r.gap_max_pct)}</div><div><span class="xs muted">구간 최저</span>${pc(r.gap_min_pct)}</div></div>
+      ${r.delisted?`<p class="xs muted" style="margin:10px 0 0">이 종목은 ${r.delisted.date}에 상장폐지됐어요 (${r.delisted.reason}).</p>`:""}</div>`}
+
+  if(!ox){
+    h+=`<div class="q">${S.done?"보기":"빈칸에 실제로 들어간 모양은?"}</div><div class="grid">`+S.order.map((k,i)=>{
+      const cls=S.done?(k===0?"real":S.ans===i?"wrong":"dim"):(S.sel===i?"sel":"");
+      const badge=S.done&&k===0?`<span class="badge" style="background:var(--good)">실제</span>`:S.done&&S.ans===i?`<span class="badge" style="background:var(--bad)">내 선택</span>`:"";
+      return `<button class="opt ${cls}" ${S.done?"disabled":`onclick="pick(${i})"`} aria-label="보기 ${i+1}"><span class="n">${i+1}</span>${badge}${chart(p,o[k],{thumb:true,range:o,id:i})}${S.done&&k!==0?`<div class="src">${SRC[q.r.decoy_sources[k-1]]||""}</div>`:""}</button>`}).join("")+`</div>`;
+    if(!S.done)h+=`<div class="bottom"><button class="cta" ${S.sel==null?"disabled":""} onclick="answer(S.sel)">${S.sel==null?"보기를 골라 주세요":(S.sel+1)+"번으로 확정"}</button></div>`;
+  } else if(!S.done){
+    h+=`<div class="q" style="text-align:center">빈칸에 들어간 이 모양, 실제일까요?</div><div class="ox">
+      <button style="color:var(--good);border-color:var(--good)" onclick="answer('O')" aria-label="O, 실제다">O</button>
+      <button style="color:var(--bad);border-color:var(--bad)" onclick="answer('X')" aria-label="X, 가짜다">X</button></div>`;
+  }
+  if(S.done)h+=`<div style="margin-top:16px"><button class="cta" onclick="advance()">${S.i==9?"결과 보기":"다음 문제"}</button></div>`;
   app.innerHTML=h;
 }
-function pick(i){S.sel===i?answer(i):(S.sel=i,render())}
+function pick(i){if(S.sel===i)answer(i);else{S.sel=i;render()}}
+function advance(){S.i++;S.i<10?next():result()}
 function answer(c){
-  if(S.done)return;clearInterval(timer);const el=performance.now()-S.t0,q=S.q;
+  if(!S||S.done)return;clearInterval(timer);const el=performance.now()-S.t0,q=S.q;
   const ok=c!=null&&el<=S.lim+300&&(cfg.type=="ox"?(c=="O")==(S.ox===0):S.order[c]===0);
   const base=100*MUL[q.d],pts=ok?Math.round((base+base*.5*Math.max(0,1-el/S.lim))*Math.min(1+.1*S.streak,2)*(cfg.type=="ox"?.5:1)):0;
-  S.done=true;S.ans=c;S.ok=ok;S.pts=pts;S.score+=pts;S.streak=ok?S.streak+1:0;S.res.push({ok,q,pts});
-  seen.add(q.r.code+q.r.gap_start);try{localStorage.setItem("cg_seen",JSON.stringify([...seen]))}catch(e){}
-  render();window.scrollTo(0,0);
+  Object.assign(S,{done:true,ans:c,ok,pts,score:S.score+pts,streak:ok?S.streak+1:0});S.res.push({ok,q,pts});
+  seen.add(key(q));save();render();window.scrollTo({top:0,behavior:"smooth"});
 }
 function result(){
-  const n=S.res.filter(r=>r.ok).length,marks=S.res.map(r=>r.ok?"🟩":"🟥").join("");
-  app.innerHTML=`<h1>결과</h1><div class="card" style="text-align:center"><div class="muted">점수</div><div style="font-size:48px;font-weight:900">${S.score.toLocaleString()}</div><div style="font-size:22px">${marks}</div><p>${n} / 10 정답</p></div>
-  <div class="card" style="margin-top:10px">${S.res.map(r=>`<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)"><span>${r.ok?"🟩":"🟥"}</span><div style="flex:1"><b>${r.q.r.name}</b><div class="muted">${r.q.r.gap_start} ~ ${r.q.r.gap_end}</div></div><span class="${r.q.r.gap_return_pct>0?"up":"dn"}">${r.q.r.gap_return_pct>0?"+":""}${r.q.r.gap_return_pct}%</span><b style="width:44px;text-align:right">${r.pts}</b></div>`).join("")}</div>
-  <button class="btn" onclick="navigator.clipboard?.writeText('빈칸 차트 ${marks} ${n}/10 · ${S.score}점')">결과 복사</button><button class="btn" style="background:var(--panel2);color:var(--ink)" onclick="home()">처음으로</button>`;
+  const n=S.res.filter(r=>r.ok).length,marks=S.res.map(r=>r.ok?"🟩":"🟥").join(""),msg=n>=9?"차트 고수!":n>=7?"감이 좋아요":n>=5?"나쁘지 않아요":"다음엔 더 잘할 거예요";
+  app.innerHTML=`<div class="hero" style="text-align:center"><div class="muted sm">${L[cfg.diff]} · ${cfg.type=="ox"?"O/X":"4지선다"} · ${L[cfg.iv]}</div>
+  <div class="score tnum" style="margin-top:10px">${S.score.toLocaleString()}</div><div class="muted" style="margin-top:6px">${msg} · ${n} / 10 정답</div>
+  <div style="font-size:22px;margin-top:12px;letter-spacing:2px">${marks}</div></div>
+  <div class="card list" style="overflow:hidden"><div class="b sm" style="padding:14px">문제별 결과</div>
+  ${S.res.map(r=>`<div class="item"><span>${r.ok?"🟩":"🟥"}</span><div class="sp" style="min-width:0"><div class="b" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.q.r.name}</div><div class="xs muted">${r.q.r.gap_start} ~ ${r.q.r.gap_end}</div></div>
+  <span class="sm tnum ${r.q.r.gap_return_pct>0?"up":"dn"}">${r.q.r.gap_return_pct>0?"+":""}${r.q.r.gap_return_pct.toFixed(1)}%</span><b class="tnum" style="width:42px;text-align:right">${r.pts}</b></div>`).join("")}</div>
+  <div style="margin-top:16px"><button class="cta" onclick="start()">한 판 더</button><button class="ghost" onclick="copyRes('${marks}',${n})">결과 복사</button><button class="ghost" onclick="home()">처음으로</button></div><p id="note" class="xs muted" style="text-align:center"></p>`;
 }
-document.head.insertAdjacentHTML("beforeend","<style>@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1}}</style>");
-addEventListener("keydown",e=>{if(!S||!S.q||!document.querySelector(".bar"))return;if(S.done&&e.key=="Enter"){S.i++;S.i<10?next():result();return}if(S.done)return;if(cfg.type=="choice4"&&"1234".includes(e.key)&&e.key)pick(+e.key-1);if(cfg.type=="ox"&&/^[ox]$/i.test(e.key))answer(e.key.toUpperCase())});
+function copyRes(m,n){const t=`빈칸 차트 ${L[cfg.diff]}\n${m}\n${n}/10 · ${S.score}점`;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>$("#note").textContent="복사했어요.",()=>$("#note").textContent="복사하지 못했어요.")}
+addEventListener("keydown",e=>{if(!S||!S.q||e.metaKey||e.ctrlKey)return;if(S.done){if(e.key=="Enter")advance();return}
+  if(cfg.type=="choice4"&&"1234".includes(e.key)&&e.key.length==1)pick(+e.key-1);else if(cfg.type=="choice4"&&e.key=="Enter"&&S.sel!=null)answer(S.sel);
+  else if(cfg.type=="ox"&&/^[ox]$/i.test(e.key))answer(e.key.toUpperCase())});
+let lastW=innerWidth;addEventListener("resize",()=>{if(innerWidth!==lastW&&S&&S.q){lastW=innerWidth;render()}});
 home();
-</script></body></html>
+</script>
+</body>
+</html>
