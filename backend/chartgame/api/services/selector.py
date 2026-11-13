@@ -4,6 +4,7 @@ from __future__ import annotations
 import random
 
 from sqlalchemy import func, select
+from sqlalchemy.orm import defer
 
 from ... import config
 from ...db.models import GameSession, Play, Question, User
@@ -69,7 +70,7 @@ def survival_level(base: str, streak: int) -> str:
 
 def _candidates(db, conds, n: int = 200) -> list[Question]:
     r = random.random()
-    cols = select(Question).where(*conds)
+    cols = select(Question).where(*conds).options(defer(Question.payload), defer(Question.reveal))  # 큰 열은 고른 뒤에 읽는다
     rows = list(db.scalars(cols.where(Question.rnd >= r).order_by(Question.rnd).limit(n)))
     if len(rows) < n:
         rows += list(db.scalars(cols.where(Question.rnd < r).order_by(Question.rnd).limit(n - len(rows))))

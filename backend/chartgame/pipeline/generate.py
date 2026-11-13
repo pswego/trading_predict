@@ -89,6 +89,11 @@ def _work(rows: list) -> tuple[list[dict], int]:
     return out, fail
 
 
+def _work_range(span: tuple[int, int]) -> tuple[list[dict], int]:
+    """프로세스 풀용: 행 자체 대신 범위만 넘긴다 (namedtuple은 피클이 안 된다)."""
+    return _work(list(_CTX["win"].iloc[span[0]:span[1]].itertuples()))
+
+
 def prepare(interval: str, limit: int | None = None):
     """정제된 시리즈(시총 구간 포함)와 종목 표."""
     stocks = load_stocks()
@@ -114,16 +119,19 @@ def run(interval: str, limit: int | None = None, workers: int = 4, max_questions
     _CTX["index"] = {G: decoys.SegIndex(series, G, stride, sectors) for _, G, _ in config.LAYOUTS[interval].values()}
     _CTX["stocks"] = {r.code: r for r in stocks.itertuples()}
     print(f"[{interval}] 출처 색인 {[(G, ix.n) for G, ix in _CTX['index'].items()]}  ({time.time() - t0:.0f}s)", flush=True)
-    rows = list(win.itertuples())
-    chunks = [rows[i:i + 200] for i in range(0, len(rows), 200)]
-    if workers > 1 and len(chunks) > 1:
-        with Pool(workers) as pool:
-            res = pool.map(_work, chunks)
+    _CTX["win"] = win.reset_index(drop=True)
+    spans = [(i, min(i + 200, len(win))) for i in range(0, len(win), 200)]
+    if workers > 1 and len(spans) > 1:
+        with Pool(workers) as pool:  # fork: _CTX를 그대로 공유
+            res = pool.map(_work_range, spans)
     else:
-        res = [_work(ch) for ch in chunks]
+        res = [_work_range(sp) for sp in spans]
     recs = [r for out, _ in res for r in out]
     fails = sum(f for _, f in res)
     df = pd.DataFrame(recs)
     df.to_parquet(config.WORK / f"questions_{interval}.parquet", index=False)
+    stats = {"stocks": len(series), "bars": int(sum(len(s) for s in series.values())), "windows": len(win),
+             "questions": len(df), "decoy_failures": fails, "seconds": round(time.time() - t0)}
+    (config.WORK / f"generate_{interval}.json").write_text(json.dumps(stats, indent=1))
     print(f"[{interval}] 문제 {len(df)}  오답 생성 실패 {fails}  ({time.time() - t0:.0f}s)", flush=True)
     return df

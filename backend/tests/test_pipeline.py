@@ -2,7 +2,7 @@ import json
 
 import numpy as np
 import pytest
-from hypothesis import given, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from chartgame import config
@@ -128,13 +128,35 @@ def test_transform_property(seed, G, k, ret, start, grid):
     s = clean.clean_frame(synth_frame(seed, 260), "000010", "KOSPI", "day")
     c0 = 15000.0
     c_end = c0 * np.exp(ret)
-    O, H, L, C, d = decoys.transform(s, start, G, k, ret, c0)
+    tf = decoys.transform(s, start, G, k, ret, c0)
+    assume(tf is not None)
+    O, H, L, C, delta = tf
+    assert abs(delta) < 1
     assert np.isclose(C[-1], c_end, rtol=1e-9)
-    assert np.isclose(d, (ret - k * s.r[start:start + G].sum()) / G)
+    assert (H >= np.maximum(O, C) * (1 - 1e-12)).all() and (L <= np.minimum(O, C) * (1 + 1e-12)).all()
     O, H, L, C = decoys.snap(O, H, L, C, grid, c_end)
     assert decoys.validate_option(O, H, L, C, c0, c_end, None, grid) is None
     if grid:
         assert np.allclose(O / grid, np.round(O / grid)) and np.allclose(C[:-1] / grid, np.round(C[:-1] / grid))
+
+
+def test_transform_keeps_flat_closes_and_dojis():
+    """종가가 안 변한 날, 시가=종가인 봉, 갭 없는 시가는 변환 뒤에도 그대로여야 한다 (없어지면 가짜 티가 난다)."""
+    df = synth_frame(11, 120)
+    df.loc[[20, 27, 33], "close"] = df.loc[[19, 26, 32], "close"].to_numpy()  # 종가 변동 없음
+    df.loc[24, "open"] = df.loc[24, "close"]  # 도지
+    df.loc[30, "open"] = df.loc[29, "close"]  # 갭 없는 시가
+    df["high"] = df[["open", "high", "close"]].max(axis=1)
+    df["low"] = df[["open", "low", "close"]].min(axis=1)
+    s = clean.clean_frame(df, "000010", "KOSPI", "day")
+    start, G, c0 = 15, 20, 9000.0
+    O, H, L, C, _ = decoys.transform(s, start, G, 1.3, 0.05, c0)
+    O, H, L, C = decoys.snap(O, H, L, C, 5.0, c0 * np.exp(0.05))
+    prev = np.concatenate([[c0], C[:-1]])
+    for i in (20, 27, 33):
+        assert C[i - start] == prev[i - start]
+    assert O[24 - start] == C[24 - start]
+    assert O[30 - start] == prev[30 - start]
 
 
 def test_validate_option_catches_violations():

@@ -109,8 +109,23 @@ def evaluate(df: pd.DataFrame, folds: int = 5, seed: int = 0) -> tuple[pd.DataFr
     out = df.assign(ai_p_real=np.round(p_real, 4), ai_hit=hit)
     acc = {d: round(float(out.loc[out.difficulty == d, "ai_hit"].mean()), 4) for d in config.DIFFICULTIES
            if (out.difficulty == d).any()}
-    # 어떤 특징이 티를 내는지: 실제/오답 평균 차이가 큰 순
-    Xn = (X - X.mean()) / (X.std() + 1e-12)
-    gapv = (Xn[y == 1].mean() - Xn[y == 0].mean()).abs().sort_values(ascending=False)
-    report = {"accuracy": acc, "n": int(len(df)), "top_tells": {k: round(float(v), 3) for k, v in gapv.head(8).items()}}
+    report = {"accuracy": acc, "n": int(len(df)), "top_tells": rank_tells(X, out["difficulty"].to_numpy())}
     return out, report
+
+
+def rank_tells(X: pd.DataFrame, difficulty: np.ndarray, top: int = 6) -> dict:
+    """특징 하나만 봤을 때 실제 보기가 4개 중 최대(또는 최소)일 확률. 25%에서 멀수록 그 특징이 단서가 된다."""
+    rng = np.random.default_rng(0)
+    keys = [k for k in X.columns if not k.endswith("_q") and k != "G"]
+    out = {}
+    for d in ("normal", "hard"):
+        m = difficulty == d
+        if not m.any():
+            continue
+        rows = []
+        for k in keys:
+            A = X[k].to_numpy().reshape(-1, 4)[m] + rng.normal(0, 1e-9, (int(m.sum()), 4))  # 동률은 무작위로 가른다
+            rows.append((k, float((A.argmax(1) == 0).mean()), float((A.argmin(1) == 0).mean())))
+        rows.sort(key=lambda r: -max(abs(r[1] - 0.25), abs(r[2] - 0.25)))
+        out[d] = {k: {"real_is_max": round(a, 3), "real_is_min": round(b, 3)} for k, a, b in rows[:top]}
+    return out

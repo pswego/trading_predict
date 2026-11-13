@@ -115,9 +115,11 @@ export default function Result() {
               <li key={i} className="flex items-center gap-3 border-b border-line px-4 py-2.5 text-sm last:border-0">
                 <span aria-label={p.correct ? "정답" : "오답"}>{p.correct ? "🟩" : "🟥"}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{p.name}</div>
-                  <div className="text-xs text-muted">
-                    {p.gap_start} ~ {p.gap_end} · {LABEL.difficulty[p.difficulty]}
+                  <div className="truncate font-semibold">
+                    {p.name} <span className="ml-1 text-xs font-normal text-muted">{LABEL.difficulty[p.difficulty]}</span>
+                  </div>
+                  <div className="whitespace-nowrap text-xs text-muted">
+                    {p.gap_start} ~ {p.gap_end}
                   </div>
                 </div>
                 <span className={`tnum ${p.gap_return_pct > 0 ? "text-up" : p.gap_return_pct < 0 ? "text-down" : ""}`}>{pct(p.gap_return_pct)}</span>
