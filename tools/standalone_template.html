@@ -448,7 +448,7 @@ async function battleLobby(){
     <div class="label">코드로 참가</div>
     <div class="row"><input id="code" class="inp" maxlength="4" placeholder="4자리 코드" style="text-transform:uppercase;flex:1" onkeydown="if(event.key=='Enter')battleJoin(this.value)"><button class="ghost" style="margin:0;width:auto;padding:13px 18px" onclick="battleJoin(document.getElementById('code').value)">참가</button></div>
     <p id="bmsg" class="xs" style="color:var(--bad);margin:8px 0 0"></p></div>
-  ${r.p2p?`<p class="sm muted" style="margin-top:16px;line-height:1.6">방을 만든 사람에게 <b>4자리 코드</b>를 받아 입력하세요. 같은 링크로 들어온 사람끼리 브라우저가 직접 연결돼요.</p>`:`
+  ${false?`<p class="sm muted" style="margin-top:16px;line-height:1.6">방을 만든 사람에게 <b>4자리 코드</b>를 받아 입력하세요. 같은 링크로 들어온 사람끼리 브라우저가 직접 연결돼요.</p>`:`
   <div class="label" style="margin-top:20px">열린 방 ${open.length?`<span class="muted">${open.length}</span>`:""}</div>
   ${open.length?open.map(p=>{const h=p.presence.hosting;return `<button class="card study-entry" style="margin-top:8px" onclick="battleJoin('${esc(String(h.code||"")).replace(/[^A-Z0-9]/g,"")}')"><span class="ic" style="font-weight:900;font-size:15px">${esc(h.code)}</span><span class="sp" style="text-align:left"><b>${esc(cleanNick(h.nick)||"익명")}의 방</b><br><span class="xs muted">${esc(cfgLabel(h.cfg))} · ${Number(h.n)||1}명</span></span><span class="muted">참가 ›</span></button>`}).join(""):`<p class="sm muted">지금 열린 방이 없어요. 방을 만들고 친구에게 코드를 알려 주세요. 같은 페이지 링크로 들어와야 보여요.</p>`}`}`}`;
 }

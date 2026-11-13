@@ -42,17 +42,17 @@ def build_questions(per_interval: dict[str, int] | None = None, seed: int = 3) -
 
 
 STATIC = config.REPO / "backend" / "chartgame" / "static"
-PEERJS = "https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"
+MQTT_JS = "https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"
 
 
 def render(questions: list[dict], room: str = "server") -> str:
-    """room: 'server' (우리 서버의 WebSocket) | 'p2p' (서버 없이 브라우저끼리, 정적 호스팅용) | 'none'"""
+    """room: 'server' (우리 서버의 WebSocket) | 'relay' (공개 MQTT 중계, 정적 호스팅용) | 'none'"""
     tpl = (config.REPO / "tools" / "standalone_template.html").read_text()
     html = tpl.replace("__DATA__", json.dumps(questions, ensure_ascii=False, separators=(",", ":")))
     if room == "server":  # 대전 연결 스크립트를 게임 스크립트보다 먼저 넣는다
         inject = '<script src="/static/room_shim.js"></script>\n'
-    elif room == "p2p":  # 정적 호스팅은 파일 하나로 끝나도록 스크립트를 그대로 넣는다
-        inject = f'<script src="{PEERJS}"></script>\n<script>{(STATIC / "room_p2p.js").read_text()}</script>\n'
+    elif room == "relay":  # 정적 호스팅: 무료 공개 MQTT 중계 서버로 대전 (네트워크가 달라도 연결됨)
+        inject = f'<script src="{MQTT_JS}"></script>\n<script>{(STATIC / "room_mqtt.js").read_text()}</script>\n'
     else:
         inject = ""
     return html.replace("<script>const Q=", inject + "<script>const Q=", 1)
@@ -68,6 +68,6 @@ def write_site(out=None) -> str:
     """GitHub Pages 등 정적 호스팅용: site/index.html 하나."""
     out = out or (config.REPO / "site")
     out.mkdir(parents=True, exist_ok=True)
-    (out / "index.html").write_text(render(build_questions(), room="p2p"))
+    (out / "index.html").write_text(render(build_questions(), room="relay"))
     (out / ".nojekyll").write_text("")
     return str(out / "index.html")
