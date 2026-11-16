@@ -185,7 +185,7 @@ svg{display:block;width:100%;height:auto}
 .btn2.sm{height:28px;padding:0 10px;margin:0 2px}.btn2.blue{background:var(--sel);box-shadow:0 3px 0 var(--sel-dark);color:#fff}
 .btn2.big{height:46px;font-size:13px;min-width:110px}.btn2.danger{color:#A33A2E}
 .phbtns{display:flex;align-items:center;padding-right:4px}
-.cta.sm{min-height:40px;width:auto;padding:0 34px;font-size:21px}
+.cta.sm{min-height:40px;width:auto;padding:0 28px;font-size:21px;white-space:nowrap;flex:none}
 .linkbtn{text-decoration:underline;color:var(--muted);font-size:11px}
 /* 로비 */
 .scr.lobby{grid-template-columns:220px minmax(0,1fr) 300px;height:calc(100vh - 46px)}
@@ -305,6 +305,15 @@ table.rooms td.empty{text-align:center;color:var(--muted);padding:24px 8px}
 .appbar .me .gtag{background:rgba(255,255,255,.15);color:#D3E2F0;border-color:transparent}
 .appbar .me[role=button]{cursor:pointer;padding:4px 8px;border-radius:8px}.appbar .me[role=button]:hover{background:rgba(255,255,255,.08)}
 .nickname{display:flex;align-items:center;gap:6px;min-width:0;font-size:14px}.nickname b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.nickname .linkbtn{margin-left:auto}
+
+/* ===== 운영 ===== */
+#noticebar{display:flex;gap:10px;align-items:center;background:#FFF4CC;border-bottom:2px solid #E8A100;padding:5px max(14px,env(safe-area-inset-right,0px)) 5px max(14px,env(safe-area-inset-left,0px));font-size:13px;color:#3A2A00}
+#noticebar b{background:#E8A100;color:#fff;border-radius:4px;padding:1px 7px;font-size:11px;flex:none}#noticebar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl.notice{color:#9A5B00;font-weight:700;background:#FFF4CC;border-radius:6px;padding:3px 8px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;background:#1E2A5E;color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 5px 0 rgba(10,16,48,.35);font-size:13px;max-width:90vw;animation:pop .2s}
+.scr.admin{grid-template-columns:repeat(3,minmax(0,1fr));min-height:calc(100vh - 46px);align-items:start}
+.scr.admin .urow .btn2.sm{height:26px;padding:0 8px}
+@media (max-width:899px){.scr.admin{display:flex;flex-direction:column}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -989,6 +998,7 @@ addEventListener("keydown",e=>{if(!S||!S.q||e.metaKey||e.ctrlKey)return;if(S.don
 let lastW=innerWidth;addEventListener("resize",()=>{if(innerWidth!==lastW&&S&&S.q){lastW=innerWidth;render()}});
 /*__UI_V2__*/
 /*__AUTH__*/
+/*__ADMIN__*/
 authBoot();
 </script>
 </body>

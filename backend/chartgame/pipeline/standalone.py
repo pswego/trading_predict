@@ -52,6 +52,7 @@ def render(questions: list[dict], room: str = "server") -> str:
     html = tpl.replace("__DATA__", json.dumps(questions, ensure_ascii=False, separators=(",", ":")))
     html = html.replace("/*__UI_V2__*/", (config.REPO / "tools" / "ui_v2.js").read_text(), 1)  # 화면 배치 코드
     html = html.replace("/*__AUTH__*/", (config.REPO / "tools" / "auth.js").read_text(), 1)  # 계정(구글 로그인·게스트)
+    html = html.replace("/*__ADMIN__*/", (config.REPO / "tools" / "admin.js").read_text(), 1)  # 운영(공지·경고·채팅 금지)
     fb_cfg = (config.REPO / "tools" / "firebase_config.js").read_text()
     fb_on = "CHARTGAP_FIREBASE = null" not in fb_cfg
     fb = "".join(f'<script src="{FIREBASE_SDK}/firebase-{m}-compat.js"></script>\n' for m in ("app", "auth", "firestore")) if fb_on else ""
