@@ -8,6 +8,11 @@
    대전 화면의 이름표는 각자 기기가 보내는 값이라, 기술적으로 흉내 낼 수는 있다(표시용). */
 const ACC={type:null,uid:null,email:"",fb:null,auth:null,db:null,ready:false,profile:null};
 const NICK_RE=/^[0-9A-Za-z가-힣_]{2,12}$/;
+// 운영자(GM) 계정: 공개 코드에 이메일을 두지 않으려고 이메일의 SHA-256 값만 둔다.
+// 'admin' 같은 예약 닉네임은 Firestore 규칙에서도 운영자 이메일에게만 허락한다(콘솔에 게시한 규칙).
+const OWNER_HASH="3a249d43dfb8548e7768bbafb940773f9423daddcaa15e7ef5e82ebe7af1aab3";
+const RESERVED=/^(게스트|손님|guest|admin|gm|운영자|관리자)/i;
+async function sha256hex(s){try{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}catch(e){return ""}}
 function guestTag(){let g="";try{g=localStorage.getItem("cg_guest")||""}catch(e){}
   if(!/^[A-Z2-9]{4}$/.test(g)){g=Array.from({length:4},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.random()*32|0]).join("");try{localStorage.setItem("cg_guest",g)}catch(e){}}return g}
 const guestNick=()=>"게스트-"+guestTag();
@@ -15,7 +20,7 @@ const isGuestNick=n=>/^게스트-/.test(String(n||""));
 function nickKey(n){return String(n).toLowerCase()}
 function nickProblem(n){
   if(!NICK_RE.test(n))return "닉네임은 2~12자의 한글·영문·숫자·밑줄(_)만 쓸 수 있어요.";
-  if(/^(게스트|손님|guest|admin|운영자|관리자)/i.test(n))return "이 단어로 시작하는 닉네임은 쓸 수 없어요.";
+  if(RESERVED.test(n)&&!(ACC.gm&&!/^(게스트|손님|guest)/i.test(n)))return "이 단어로 시작하는 닉네임은 쓸 수 없어요.";
   return null;
 }
 
@@ -28,10 +33,10 @@ saveProfile=function(p){try{localStorage.setItem(profKey(),JSON.stringify(p))}ca
 /* ---- presence 에 계정 종류를 싣는다 (게스트 표시용) ---- */
 const _setLobbyPresence=setLobbyPresence;
 let lastAcct="";
-setLobbyPresence=function(st){const a=ACC.type=="guest"?"g":ACC.type?"u":"";if(B.room&&a&&a!==lastAcct){lastAcct=a;B.room.presence({acct:a}).catch(()=>{})}_setLobbyPresence(st)};  // 바뀔 때만 보낸다 (보내면 로비가 다시 그려지므로)
+setLobbyPresence=function(st){const a=ACC.type=="guest"?"g":ACC.type?(ACC.gm?"gm":"u"):"";if(B.room&&a&&a!==lastAcct){lastAcct=a;B.room.presence({acct:a,gm:ACC.gm?1:null}).catch(()=>{})}_setLobbyPresence(st)};  // 바뀔 때만 보낸다 (보내면 로비가 다시 그려지므로)
 const _battleEnter2=battleEnter;
-battleEnter=async function(code,host,settings,pw){await _battleEnter2(code,host,settings,pw);if(B.mroom)B.mroom.presence({acct:ACC.type=="guest"?"g":"u"}).catch(()=>{})};
-const guestBadge=`<span class="gtag">게스트</span>`;
+battleEnter=async function(code,host,settings,pw){await _battleEnter2(code,host,settings,pw);if(B.mroom)B.mroom.presence({acct:ACC.type=="guest"?"g":"u",gm:ACC.gm?1:null}).catch(()=>{})};
+const guestBadge=`<span class="gtag">게스트</span>`,gmBadge=`<span class="gmtag" title="운영자">GM</span>`;
 
 /* ---- 시작 ---- */
 async function authBoot(){
@@ -61,6 +66,7 @@ async function googleLogin(){
 }
 async function afterGoogle(u){
   ACC.type="google";ACC.uid=u.uid;ACC.email=u.email||"";
+  ACC.gm=!!(u.emailVerified!==false&&ACC.email&&await sha256hex(ACC.email.trim().toLowerCase())===OWNER_HASH);
   try{localStorage.setItem("cg_mode","google")}catch(e){}
   let doc=null;try{const s=await ACC.db.doc("users/"+u.uid).get();doc=s.exists?s.data():null}catch(e){}
   if(doc){ACC.profile=doc;const p={total:doc.total|0,wins:doc.wins|0,losses:doc.losses|0,games:doc.games|0},local=loadProfile();
@@ -137,7 +143,7 @@ function accountMenu(){
   const el=document.createElement("div");el.className="modal";el.onclick=e=>{if(e.target===el)el.remove()};
   const g=ACC.type=="guest";
   el.innerHTML=`<div class="sheet pn2"><div class="ph dark"><span>내 계정</span><small><button class="x" onclick="this.closest('.modal').remove()" aria-label="닫기">✕</button></small></div><div style="padding:12px;display:grid;gap:8px">
-    <div class="row" style="gap:10px">${avatar(nick,44)}<div><b>${esc(nick)}</b> ${g?guestBadge:""}<div class="xs muted">${g?"게스트 · 기록은 이 브라우저에만 남아요":esc(ACC.email)}</div></div></div>
+    <div class="row" style="gap:10px">${avatar(nick,44)}<div><b>${esc(nick)}</b> ${g?guestBadge:""}${ACC.gm?gmBadge:""}<div class="xs muted">${g?"게스트 · 기록은 이 브라우저에만 남아요":esc(ACC.email)}</div></div></div>
     ${g?`<button class="gbtn" onclick="this.closest('.modal').remove();googleLogin()" ${ACC.auth?"":"disabled"}>${G_LOGO}<span>Google 계정으로 로그인</span></button><p class="xs muted" style="margin:0">로그인하면 닉네임을 직접 정할 수 있어요. 게스트 기록은 옮겨지지 않아요.</p>`
       :`<button class="btn2 big" onclick="this.closest('.modal').remove();createAccountScreen(null,true)">닉네임 바꾸기</button>`}
     <button class="btn2 big danger" onclick="logout()">${g?"게스트 그만하기":"로그아웃"}</button></div></div>`;
@@ -148,7 +154,8 @@ const _setBar=setBar;
 setBar=function(right,active){
   _setBar(right,active);const me=$(".appbar .me");
   if(right==null&&me&&ACC.type){me.setAttribute("role","button");me.tabIndex=0;me.title="내 계정";me.onclick=accountMenu;me.onkeydown=e=>{if(e.key=="Enter")accountMenu()};
-    if(ACC.type=="guest"&&!me.querySelector(".gtag"))me.querySelector("b").insertAdjacentHTML("afterend",guestBadge)}
+    if(ACC.type=="guest"&&!me.querySelector(".gtag"))me.querySelector("b").insertAdjacentHTML("afterend",guestBadge);
+    if(ACC.gm&&!me.querySelector(".gmtag"))me.querySelector("b").insertAdjacentHTML("afterend",gmBadge)}
 };
 /* 로비 내 정보: 닉네임은 계정에서만 바꾼다 */
 const _home=home;
@@ -161,9 +168,15 @@ home=function(){
   markGuests();
 };
 function markGuests(){
-  const guests=new Set();for(const src of [B.lobby||[],B.peers||[]])for(const p of src)if(p.presence&&p.presence.acct=="g"&&p.presence.nick)guests.add(cleanNick(p.presence.nick));
-  if(ACC.type=="guest")guests.add(nick);
-  document.querySelectorAll(".urow .sp, .snick, .pcard .sh b, .ulist .urow b.sp").forEach(el=>{const n=el.textContent.replace(/\s*나$/,"").trim();if((guests.has(n)||isGuestNick(n))&&!el.querySelector(".gtag"))el.insertAdjacentHTML("beforeend"," "+guestBadge)});
+  const guests=new Set(),gms=new Set();
+  for(const src of [B.lobby||[],B.peers||[]])for(const p of src){if(!p.presence||!p.presence.nick)continue;const n=cleanNick(p.presence.nick);if(p.presence.acct=="g")guests.add(n);if(p.presence.gm==1&&!isGuestNick(n))gms.add(n)}
+  if(ACC.type=="guest")guests.add(nick);if(ACC.gm)gms.add(nick);
+  document.querySelectorAll(".urow .sp, .snick, .pcard .sh b, .ulist .urow b.sp, .chatlog .cl b, .nickname b").forEach(el=>{
+    const n=el.textContent.replace(/\s*나$/,"").replace(/GM|게스트/g,"").trim();
+    if(gms.has(n)&&!el.parentElement.querySelector(".gmtag"))el.insertAdjacentHTML("afterend",gmBadge);
+    else if((guests.has(n)||isGuestNick(n))&&!el.querySelector(".gtag")&&!el.closest(".chatlog"))el.insertAdjacentHTML("beforeend"," "+guestBadge)});
 }
 for(const fn of ["battleRoom","renderReveal","battleResultView"]){const orig=window[fn];if(typeof orig=="function")window[fn]=function(){const r=orig.apply(this,arguments);markGuests();return r}}
 const _render=render;render=function(){_render();markGuests()};
+
+const _refreshChat=refreshChat;refreshChat=function(w){_refreshChat(w);markGuests()};
