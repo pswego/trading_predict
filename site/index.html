@@ -630,8 +630,9 @@ function waitFor(fn,ms){return new Promise(res=>{const t0=Date.now();(function p
 function lobbyAdvert(){if(!B.room||!B.host)return;const g=B.game||{},n=players().length||1;
   B.room.presence({hosting:B.status=="left"?null:{code:B.code,title:g.title||"",nick:cleanNick(nick),cfg:g.cfg,qn:g.n,sec:g.sec,max:g.max,n,lock:!!g.pwh,pub:g.pub!==false,status:g.phase=="q"?"playing":"lobby",ts:Date.now()}}).catch(()=>{})}
 setInterval(()=>{if(B.host&&B.mroom)lobbyAdvert()},15000);
-function players(){return B.peers.filter(p=>p.kind=="viewer"&&p.presence&&p.presence.nick).map(p=>({peer:p.peer,me:p.sameTab,nick:cleanNick(p.presence.nick)||"익명",host:p.presence.role=="host",ready:!!p.presence.ready,status:String(p.presence.status||""),round:Number(p.presence.round)||0,score:Math.max(0,Number(p.presence.score)||0),res:String(p.presence.res||"").replace(/[^01-]/g,"").slice(0,20),joined:Number(p.presence.joined)||0,game:p.presence.game}))}
-function hostGame(){const h=players().find(p=>p.host&&p.game&&typeof p.game=="object");return h?h.game:null}
+function players(){const raw=rawPlayers(),h=raw.find(p=>p.host&&p.game&&typeof p.game=="object"),k=h&&Array.isArray(h.game.kick)?h.game.kick:[];return raw.filter(p=>!k.includes(p.peer))}
+function rawPlayers(){return B.peers.filter(p=>p.kind=="viewer"&&p.presence&&p.presence.nick).map(p=>({peer:p.peer,me:p.sameTab,nick:cleanNick(p.presence.nick)||"익명",host:p.presence.role=="host",ready:!!p.presence.ready,status:String(p.presence.status||""),round:Number(p.presence.round)||0,score:Math.max(0,Number(p.presence.score)||0),res:String(p.presence.res||"").replace(/[^01-]/g,"").slice(0,20),joined:Number(p.presence.joined)||0,game:p.presence.game}))}
+function hostGame(){const h=rawPlayers().find(p=>p.host&&p.game&&typeof p.game=="object");return h?h.game:null}
 const roundPlayers=()=>{const g=B.host?B.game:(hostGame()||B.game),k=(g&&Array.isArray(g.kick))?g.kick:[];return players().filter(p=>p.round==B.round&&!k.includes(p.peer))};
 
 /* ---- 방 상태 변화 ---- */
@@ -642,6 +643,7 @@ function onBattlePeers(){
     if(g&&kickedMe(g)){clearInterval(timer);battleLeaveQuiet();battleLobby("방장이 이 방에서 내보냈어요.");return}
     if(g){
       if(Number(g.round)>B.round&&g.phase=="q"&&Number(g.seed)){B.game=g;B.round=Number(g.round);battleStartLocal();return}
+      if(g.phase=="lobby"&&(B.view=="result"||B.view==null&&S&&S.battle)){B.game=g;B.ready=false;B.mroom.presence({ready:false,status:"lobby"}).catch(()=>{});battleRoom();return}
       if(Number(g.round)==B.round&&B.round>0){B.game=g;followGame()}
       else if(B.view=="room")B.game=g;
     }
@@ -692,7 +694,7 @@ function battleKick(peer){
   const g=B.game;B.game={...g,kick:[...(g.kick||[]),peer].slice(-50),ban:[...new Set([...(g.ban||[]),p.nick])].slice(-50)};
   B.mroom.presence({game:B.game}).catch(()=>{});lobbyAdvert();refreshBattleView();
 }
-function kickedMe(g){if(!g)return false;const me=players().find(p=>p.me);return (me&&Array.isArray(g.kick)&&g.kick.includes(me.peer))}
+function kickedMe(g){if(!g)return false;const me=rawPlayers().find(p=>p.me);return (me&&Array.isArray(g.kick)&&g.kick.includes(me.peer))}
 function copyCode(){const m=$("#cmsg");try{navigator.clipboard.writeText(B.code).then(()=>m.textContent="복사했어요.",()=>m.textContent="코드: "+B.code)}catch(e){m.textContent="코드: "+B.code}}
 function toggleReady(){B.ready=!B.ready;B.mroom.presence({ready:B.ready}).catch(()=>{});battleRoom()}
 
@@ -759,7 +761,7 @@ function battleResultView(){
   ${B.mine?`<button class="ghost" onclick="result()">내 문제별 결과·해설 보기</button>`:""}<button class="ghost" onclick="battleLeave();battleLobby()">방 나가기</button></div>`;
 }
 function battleRematch(){battleStart()}
-function battleBackToRoom(){B.game={...B.game,phase:"lobby"};B.mroom.presence({game:B.game,status:"lobby"}).catch(()=>{});lobbyAdvert();battleRoom()}
+function battleBackToRoom(){B.status="lobby";B.game={...B.game,phase:"lobby"};B.mroom.presence({game:B.game,status:"lobby"}).catch(()=>{});lobbyAdvert();battleRoom()}
 async function battleLeaveQuiet(){const mr=B.mroom;Object.assign(B,{mroom:null,code:null,host:false,round:0,game:null,peers:[],view:null,mine:null,hostGone:false,sawHost:false});if(mr)await mr.leave().catch(()=>{})}
 function battleLeave(){clearInterval(B.loop);B.status="left";if(B.host)lobbyAdvert();B.status="idle";battleLeaveQuiet()}
 
