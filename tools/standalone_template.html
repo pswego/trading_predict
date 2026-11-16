@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>빈칸 차트</title>
+<!--__FIREBASE__-->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Noto+Sans+KR:wght@400;500;700;900&family=Nanum+Gothic+Coding:wght@400;700&display=swap">
 <style>
@@ -291,6 +292,18 @@ table.rooms td.empty{text-align:center;color:var(--muted);padding:24px 8px}
   table.rooms th:nth-child(4),table.rooms td:nth-child(4):not(.empty),table.rooms th:nth-child(1),table.rooms td:nth-child(1):not(.empty){display:none}
   .appbar{gap:8px}.appbar .logo{font-size:22px;white-space:nowrap}.appbar .me b{max-width:72px}.appbar .me em{display:none}
 }
+
+/* ===== 계정 ===== */
+.scr.auth{grid-template-columns:minmax(0,440px);justify-content:center;padding-top:60px}
+.authp .authb{padding:16px;display:flex;flex-direction:column;gap:10px}
+.authlead{margin:0;font-size:14px;line-height:1.65}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;height:48px;border-radius:10px;background:#fff;border:1px solid #C9D3DC;box-shadow:0 3px 0 #C9CFDD;font-weight:700;font-size:15px;color:#1E2433;width:100%}
+.gbtn svg{width:18px!important;height:18px!important;flex:none;display:inline-block}.gbtn:active{transform:translateY(2px);box-shadow:0 1px 0 #C9CFDD}.gbtn:disabled{opacity:.5;transform:none}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.gtag{display:inline-block;font-size:10px;font-weight:800;color:#5C6478;background:#E9ECF2;border:1px solid #C9D3DC;border-radius:4px;padding:0 4px;margin-left:4px;vertical-align:1px;font-family:var(--f-body)}
+.appbar .me .gtag{background:rgba(255,255,255,.15);color:#D3E2F0;border-color:transparent}
+.appbar .me[role=button]{cursor:pointer;padding:4px 8px;border-radius:8px}.appbar .me[role=button]:hover{background:rgba(255,255,255,.08)}
+.nickname{display:flex;align-items:center;gap:6px;min-width:0;font-size:14px}.nickname b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.nickname .linkbtn{margin-left:auto}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -974,7 +987,8 @@ addEventListener("keydown",e=>{if(!S||!S.q||e.metaKey||e.ctrlKey)return;if(S.don
   else if(cfg.type=="ox"&&/^[ox]$/i.test(e.key))answer(e.key.toUpperCase())});
 let lastW=innerWidth;addEventListener("resize",()=>{if(innerWidth!==lastW&&S&&S.q){lastW=innerWidth;render()}});
 /*__UI_V2__*/
-home();
+/*__AUTH__*/
+authBoot();
 </script>
 </body>
 </html>

@@ -41,10 +41,13 @@
       function snap(){var now=Date.now(),out=[{peer:me,by:null,isMe:true,sameTab:true,kind:"viewer",guest:false,presence:Object.freeze(Object.assign({},mine)),updatedAt:now}];
         for(var k in others){if(now-(seen[k]||0)<STALE)out.push({peer:k,by:null,isMe:false,sameTab:false,kind:"viewer",guest:false,presence:Object.freeze(Object.assign({},others[k])),updatedAt:seen[k]})}return out}
       function fire(){var s=snap();hs.forEach(function(h){try{h({peers:s,joined:[],left:[],updated:[]})}catch(e){}})}
-      function pub(only){if(left)return;var body=JSON.stringify(mine);if(body.length>4096)return;var send=function(c){c.publish(base+me,body,{qos:1,retain:true})};if(only)send(only);else eachClient(send)}
+      function pub(only){if(left)return;var body=JSON.stringify(Object.assign({},mine,{_ts:Date.now()}));if(body.length>4096)return;var send=function(c){c.publish(base+me,body,{qos:1,retain:true})};if(only)send(only);else eachClient(send)}
       var r={name:name,
         _msg:function(peer,buf){if(peer===me)return;var s=buf.toString();if(!s){delete others[peer];delete seen[peer];fire();return}
-          try{var p=JSON.parse(s);if(p&&typeof p==="object"){others[peer]=p;seen[peer]=Date.now();fire()}}catch(e){}},
+          try{var p=JSON.parse(s);if(p&&typeof p==="object"){
+            // 보관(retain)된 오래된 상태는 무시한다: 창을 닫고 정리되지 않은 사람이 목록에 남지 않게 (보낸 쪽 시계 기준 60초)
+            var ts=Number(p._ts)||0;if(Math.abs(Date.now()-ts)>60000){delete others[peer];delete seen[peer];fire();return}
+            delete p._ts;others[peer]=p;seen[peer]=Date.now();fire()}}catch(e){}},
         _gone:function(peer){if(others[peer]){delete others[peer];delete seen[peer];fire()}},
         _resub:function(c){c.subscribe(base+"+");if(Object.keys(mine).length)pub(c)},
         presence:function(patch){for(var k in patch){if(patch[k]===null)delete mine[k];else mine[k]=patch[k]}pub();fire();return Promise.resolve()},

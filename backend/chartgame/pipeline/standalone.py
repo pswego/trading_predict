@@ -43,6 +43,7 @@ def build_questions(per_interval: dict[str, int] | None = None, seed: int = 3) -
 
 STATIC = config.REPO / "backend" / "chartgame" / "static"
 MQTT_JS = "https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"
+FIREBASE_SDK = "https://www.gstatic.com/firebasejs/10.12.2"
 
 
 def render(questions: list[dict], room: str = "server") -> str:
@@ -50,6 +51,11 @@ def render(questions: list[dict], room: str = "server") -> str:
     tpl = (config.REPO / "tools" / "standalone_template.html").read_text()
     html = tpl.replace("__DATA__", json.dumps(questions, ensure_ascii=False, separators=(",", ":")))
     html = html.replace("/*__UI_V2__*/", (config.REPO / "tools" / "ui_v2.js").read_text(), 1)  # 화면 배치 코드
+    html = html.replace("/*__AUTH__*/", (config.REPO / "tools" / "auth.js").read_text(), 1)  # 계정(구글 로그인·게스트)
+    fb_cfg = (config.REPO / "tools" / "firebase_config.js").read_text()
+    fb_on = "CHARTGAP_FIREBASE = null" not in fb_cfg
+    fb = "".join(f'<script src="{FIREBASE_SDK}/firebase-{m}-compat.js"></script>\n' for m in ("app", "auth", "firestore")) if fb_on else ""
+    html = html.replace("<!--__FIREBASE__-->", fb + f"<script>{fb_cfg}</script>", 1)
     if room == "server":  # 대전 연결 스크립트를 게임 스크립트보다 먼저 넣는다
         inject = '<script src="/static/room_shim.js"></script>\n'
     elif room == "relay":  # 정적 호스팅: 무료 공개 MQTT 중계 서버로 대전 (네트워크가 달라도 연결됨)
