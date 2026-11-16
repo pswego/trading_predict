@@ -49,6 +49,7 @@ def render(questions: list[dict], room: str = "server") -> str:
     """room: 'server' (우리 서버의 WebSocket) | 'relay' (공개 MQTT 중계, 정적 호스팅용) | 'none'"""
     tpl = (config.REPO / "tools" / "standalone_template.html").read_text()
     html = tpl.replace("__DATA__", json.dumps(questions, ensure_ascii=False, separators=(",", ":")))
+    html = html.replace("/*__UI_V2__*/", (config.REPO / "tools" / "ui_v2.js").read_text(), 1)  # 화면 배치 코드
     if room == "server":  # 대전 연결 스크립트를 게임 스크립트보다 먼저 넣는다
         inject = '<script src="/static/room_shim.js"></script>\n'
     elif room == "relay":  # 정적 호스팅: 무료 공개 MQTT 중계 서버로 대전 (네트워크가 달라도 연결됨)
